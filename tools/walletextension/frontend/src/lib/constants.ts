@@ -4,6 +4,7 @@ export const tenGatewayAddress =
 export const tenscanLink = "https://testnet.tenscan.io";
 
 export const socialLinks = {
+  faucet: "https://faucet.ten.xyz",
   github: "https://github.com/ten-protocol",
   discord: "https://discord.gg/tenprotocol",
   twitter: "https://twitter.com/tenprotocol",

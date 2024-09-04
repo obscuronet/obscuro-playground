@@ -25,10 +25,10 @@ const Connected = () => {
         <h3 className="text-sm text-muted-foreground my-4">
           Manage the accounts you have connected to the Ten Gateway. You can
           revoke access to your accounts at any time and request new tokens from
-          the Ten Discord.
+          the Ten Faucet.
         </h3>
         <div className="flex justify-end space-x-2 my-4">
-          <LinkButton size={"sm"} href={socialLinks.discord} target="_blank">
+          <LinkButton size={"sm"} href={socialLinks.faucet} target="_blank">
             Request Tokens
           </LinkButton>
           <Button size={"sm"} variant={"destructive"} onClick={revokeAccounts}>
