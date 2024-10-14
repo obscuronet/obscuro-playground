@@ -199,6 +199,16 @@ func (rpc *EncryptionManager) doEstimateGas(ctx context.Context, args *gethapi.T
 	}
 	cap = hi //nolint: revive
 
+	isFailedAtMax, _, err := rpc.isGasEnough(ctx, args, hi, blkNumber)
+	//TODO: Workaround for the weird conensus nil statement down, which gets interwined with evm errors.
+	// Here if there is a consensus error - we'd bail. If the tx fails at max gas - we'd bail (probably bad)
+	if err != nil {
+		return 0, gethcommon.Big0, err
+	}
+	if isFailedAtMax {
+		return 0, gethcommon.Big0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+	}
+
 	// Execute the binary search and hone in on an isGasEnough gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
@@ -208,13 +218,18 @@ func (rpc *EncryptionManager) doEstimateGas(ctx context.Context, args *gethapi.T
 			// range here is skewed to favor the low side.
 			mid = lo * 2
 		}
-		failed, _, err := rpc.isGasEnough(ctx, args, mid, blkNumber)
+		failed, _, _ := rpc.isGasEnough(ctx, args, mid, blkNumber)
+		// TODO @siliev: The following statement is bullshit. I dont know why its here.
+		// We might have masked our internal workings, or mixed up with how geth works.
+		// Either way transaction reverted is counted as a consensus error, rather than
+		// EVM failure.
+
 		// If the error is not nil(consensus error), it means the provided message
 		// call or transaction will never be accepted no matter how much gas it is
 		// assigned. Return the error directly, don't struggle any more.
-		if err != nil {
+		/*if err != nil && isFailedAtMax {
 			return 0, gethcommon.Big0, err
-		}
+		}*/
 		if failed {
 			lo = mid
 		} else {

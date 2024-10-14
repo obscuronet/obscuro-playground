@@ -9,7 +9,7 @@
         "4bfe14725e685901c062ccd4e220c61cf9c189897b6c78bd18d7f51291b2b8f1"
       ]
     },
-    "localObscuro": {
+    "localDebugNetworkFull": {
       "chainId": 443,
       "url": "http://127.0.0.1:11180/v1/",
       "useGateway": true,
@@ -30,7 +30,7 @@
         "4bfe14725e685901c062ccd4e220c61cf9c189897b6c78bd18d7f51291b2b8f8"
       ]
     },
-    "testObscuro": {
+    "localDebugNetwork": {
       "chainId": 443,
       "url": "http://127.0.0.1:11180/v1/",
       "useGateway": true,
@@ -132,7 +132,7 @@
         "layer1" : "localTestnetGeth"
       },
       "deploy": [
-        "deployment_scripts/testing"
+        "deployment_scripts/testing/004_upgrade_uups.ts"
        ],
       "accounts": [
         "8dfb8083da6275ae3e4f41e3e8a8c19d028d32c9247e24530933782f2a05035b",

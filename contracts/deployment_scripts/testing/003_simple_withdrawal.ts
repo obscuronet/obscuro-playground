@@ -54,6 +54,7 @@ async function waitForRootPublished(management, msg, proof, root, provider: Ethe
     
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+    return;
     const l2Network = hre; 
     const {deployer} = await hre.getNamedAccounts();
     
