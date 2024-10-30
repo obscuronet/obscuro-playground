@@ -47,8 +47,8 @@ export interface IWalletState {
   isWrongNetwork: boolean;
   loading: boolean;
   initializeProvider: () => void;
-  connectWallet: () => void;
+  connectWallet?: () => void;
   disconnectWallet: () => void;
   switchNetwork: () => void;
-  restoreWalletState: () => void;
+  restoreWalletState?: () => void;
 }

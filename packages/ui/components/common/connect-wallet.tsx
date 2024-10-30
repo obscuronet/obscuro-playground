@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Link2Icon,
   LinkBreak2Icon,
@@ -7,18 +8,14 @@ import { cn, downloadMetaMask, ethereum } from "../../lib/utils";
 import useWalletStore from "../../stores/wallet-store";
 import TruncatedAddress from "./truncated-address";
 import { Button } from "../shared/button";
-import { ButtonVariants } from "../../lib/types/ui";
-
-interface ConnectWalletButtonProps {
-  className?: string;
-  variant?: ButtonVariants;
-  text?: string;
-}
+import { ConnectWalletButtonProps } from "../../lib/interfaces/ui";
 
 const ConnectWalletButton = ({
   className,
   text = "Connect Wallet",
   variant = "outline",
+  onConnect,
+  renderContent,
 }: ConnectWalletButtonProps) => {
   const {
     walletConnected,
@@ -42,12 +39,14 @@ const ConnectWalletButton = ({
 
     if (walletConnected) {
       disconnectWallet();
+    } else if (onConnect) {
+      onConnect();
     } else {
-      connectWallet();
+      connectWallet?.();
     }
   };
 
-  const renderButtonContent = () => {
+  const defaultRenderContent = () => {
     if (!ethereum) {
       return (
         <>
@@ -79,6 +78,15 @@ const ConnectWalletButton = ({
     );
   };
 
+  const content = renderContent
+    ? renderContent({
+        walletConnected,
+        isWrongNetwork,
+        address,
+        text,
+      })
+    : defaultRenderContent();
+
   return (
     <Button
       className={cn("text-sm font-medium leading-none", className)}
@@ -86,7 +94,7 @@ const ConnectWalletButton = ({
       onClick={handleClick}
       suppressHydrationWarning
     >
-      {renderButtonContent()}
+      {content}
     </Button>
   );
 };

@@ -1,9 +1,9 @@
-import { Alert, AlertDescription } from "../../ui/alert";
+import React from "react";
+import { Alert, AlertDescription } from "@repo/ui/components/shared/alert";
 import useGatewayService from "../../../services/useGatewayService";
 import { Terminal, Badge } from "lucide-react";
-import React from "react";
 
-import { Button } from "../../ui/button";
+import { Button } from "@repo/ui/components/shared/button";
 import {
   Dialog,
   DialogClose,
@@ -13,10 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../../ui/dialog";
-import Copy from "../common/copy";
-import {tenChainIDDecimal, tenGatewayAddress, CONNECTION_STEPS} from "../../../lib/constants";
-import { downloadMetaMask, ethereum } from "@/lib/utils";
+} from "@repo/ui/components/shared/dialog";
+import Copy from "@repo/ui/components/common/copy";
+import {
+  tenChainIDDecimal,
+  tenGatewayAddress,
+  CONNECTION_STEPS,
+} from "../../../lib/constants";
+import { downloadMetaMask, ethereum } from "@repo/ui/lib/utils";
 
 const Disconnected = () => {
   const { connectToTenTestnet } = useGatewayService();

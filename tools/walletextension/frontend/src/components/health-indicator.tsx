@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Badge, badgeVariants } from "./ui/badge";
 import useGatewayService from "@/services/useGatewayService";
-import { Skeleton } from "./ui/skeleton";
+import { Badge, badgeVariants } from "@repo/ui/components/shared/badge";
+import { Skeleton } from "@repo/ui/components/shared/skeleton";
 
 const HealthIndicator = () => {
   const { getTestnetStatus } = useGatewayService();

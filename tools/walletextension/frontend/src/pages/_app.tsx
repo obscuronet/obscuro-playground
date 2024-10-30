@@ -1,9 +1,9 @@
 import { ThemeProvider } from "../components/providers/theme-provider";
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
-import { Toaster } from "../components/ui/toaster";
+import { Toaster } from "@repo/ui/components/shared/toaster";
 import { WalletConnectionProvider } from "../components/providers/wallet-provider";
-import { NetworkStatus } from "../components/modules/common/network-status";
+import { NetworkStatus } from "@repo/ui/components/common/network-status";
 import HeadSeo from "@/components/head-seo";
 import Script from "next/script";
 import { GOOGLE_ANALYTICS_ID } from "@/lib/constants";

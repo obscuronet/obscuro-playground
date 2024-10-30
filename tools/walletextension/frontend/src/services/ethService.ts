@@ -1,27 +1,95 @@
 import { ethers } from "ethers";
+import { ToastType } from "@repo/ui/lib/enums/toast";
+import { showToast, toast } from "@repo/ui/components/shared/use-toast";
+import { ethereum } from "@repo/ui/lib/utils";
 import {
-  authenticateAccountWithTenGatewayEIP712,
-  getToken,
-} from "@/api/ethRequests";
-import { accountIsAuthenticated } from "@/api/gateway";
-import { showToast } from "@/components/ui/use-toast";
-import { METAMASK_CONNECTION_TIMEOUT } from "@/lib/constants";
-import { isTenChain, isValidTokenFormat, ethereum } from "@/lib/utils";
-import { ToastType } from "@/types/interfaces";
+  nativeCurrency,
+  tenChainIDDecimal,
+  tenChainIDHex,
+  tenNetworkName,
+  tenscanAddress,
+  userStorageAddress,
+  METAMASK_CONNECTION_TIMEOUT,
+  SWITCHED_CODE,
+} from "@/lib/constants";
+import {
+  getRandomIntAsString,
+  isTenChain,
+  isValidTokenFormat,
+} from "@/lib/utils";
+import { requestMethods } from "@/routes";
+import {
+  accountIsAuthenticated,
+  authenticateUser,
+  fetchVersion,
+  revokeAccountsApi,
+} from "@/api/gateway";
 import { Account } from "@/types/interfaces/WalletInterfaces";
 
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: "name", type: "string" },
+      { name: "version", type: "string" },
+      { name: "chainId", type: "uint256" },
+    ],
+    Authentication: [{ name: "Encryption Token", type: "address" }],
+  },
+  primaryType: "Authentication",
+  domain: {
+    name: "Ten",
+    version: "1.0",
+    chainId: tenChainIDDecimal,
+  },
+  message: {
+    "Encryption Token": "0x",
+  },
+};
+
 const ethService = {
+  initializeGateway: async (set: any, get: any) => {
+    try {
+      const providerInstance = new ethers.providers.Web3Provider(ethereum);
+      set({ provider: providerInstance });
+
+      await ethService.checkIfMetamaskIsLoaded(providerInstance);
+
+      const fetchedToken = await ethService.getToken(providerInstance);
+      set({ token: fetchedToken });
+
+      const accounts = await ethService.getAccounts(providerInstance, set);
+      set({ accounts: accounts || null });
+
+      const status = await ethService.isUserConnectedToTenChain(fetchedToken);
+      set({ walletConnected: status });
+
+      const version = await fetchVersion();
+      set({ version });
+    } catch (error: any) {
+      toast({
+        title: "Invalid Encrypted Token",
+        variant: ToastType.DESTRUCTIVE,
+        description:
+          error instanceof Error
+            ? error.message
+            : error?.data?.message?.includes("not found")
+              ? "Please restart the process to get a new encryption token by removing TEN Testnet from your wallet and reconnecting."
+              : "An error occurred. Please try again.}",
+      });
+      set({ walletConnected: false });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
   checkIfMetamaskIsLoaded: async (provider: ethers.providers.Web3Provider) => {
     try {
       if (ethereum) {
-        // There are some wallets that are conflicting with MetaMask - we want to check that and throw an error if they are connected
         const conflictingWalletMap = {
           "Exodus Wallet": ethereum.isExodus,
           "Nest Wallet": ethereum.isNestWallet,
-          // Add other wallets here as needed
         };
 
-        // Iterate over the wallet map and handle conflicts
         for (const [walletName, isWalletConnected] of Object.entries(
           conflictingWalletMap
         )) {
@@ -48,9 +116,7 @@ const ethService = {
             clearTimeout(timeoutId);
             handleEthereumOnce();
           },
-          {
-            once: true,
-          }
+          { once: true }
         );
 
         timeoutId = setTimeout(() => {
@@ -81,17 +147,63 @@ const ethService = {
 
   isUserConnectedToTenChain: async (token: string) => {
     if (await isTenChain()) {
-      if (token && isValidTokenFormat(token)) {
-        return true;
-      } else {
-        return false;
+      return !!(token && isValidTokenFormat(token));
+    }
+    return false;
+  },
+
+  getAccounts: async (provider: ethers.providers.Web3Provider, set: any) => {
+    if (!provider) {
+      showToast(
+        ToastType.DESTRUCTIVE,
+        "No provider found. Please try again later."
+      );
+      return;
+    }
+
+    const token = await ethService.getToken(provider);
+
+    if (!token || !isValidTokenFormat(token)) {
+      set({ walletConnected: false });
+      return;
+    }
+
+    try {
+      showToast(ToastType.INFO, "Getting accounts...");
+
+      if (!(await isTenChain())) {
+        showToast(ToastType.DESTRUCTIVE, "Please connect to the TEN chain.");
+        set({ walletConnected: false });
+        return;
       }
-    } else {
-      return false;
+
+      const accounts = await provider.listAccounts();
+
+      if (accounts.length === 0) {
+        showToast(ToastType.DESTRUCTIVE, "No MetaMask accounts found.");
+        set({ walletConnected: false });
+        return [];
+      }
+      showToast(ToastType.SUCCESS, "Accounts found!");
+
+      set({ token, walletConnected: true });
+
+      const authenticatedAccounts = await ethService.authenticateAccounts(
+        accounts,
+        provider,
+        token
+      );
+
+      return authenticatedAccounts;
+    } catch (error) {
+      console.error(error);
+      showToast(ToastType.DESTRUCTIVE, "An error occurred. Please try again.");
+      set({ walletConnected: false });
+      throw error;
     }
   },
 
-  formatAccounts: async (
+  authenticateAccounts: async (
     accounts: string[],
     provider: ethers.providers.Web3Provider,
     token: string
@@ -101,70 +213,244 @@ const ethService = {
         ToastType.DESTRUCTIVE,
         "No provider found. Please try again later."
       );
-      return;
+      return [];
     }
-    let updatedAccounts: Account[] = [];
-    showToast(ToastType.INFO, "Checking account authentication status...");
-    const authenticationPromise = accounts.map((account) =>
-      accountIsAuthenticated(token, account).then(({ status }) => {
+    showToast(ToastType.INFO, "Authenticating accounts...");
+    const updatedAccounts = await Promise.all(
+      accounts.map(async (account) => {
+        const isAuthenticated = await accountIsAuthenticated(token, account);
+
+        if (!isAuthenticated.status) {
+          const authenticated = await ethService.authenticateWithGateway(
+            token,
+            account
+          );
+
+          return {
+            name: account,
+            connected: authenticated,
+          };
+        }
+
         return {
           name: account,
-          connected: status,
+          connected: isAuthenticated.status,
         };
       })
     );
-    updatedAccounts = await Promise.all(authenticationPromise);
-    showToast(ToastType.INFO, "Account authentication status updated!");
+
+    showToast(ToastType.SUCCESS, "Accounts authenticated!");
     return updatedAccounts;
   },
 
-  getAccounts: async (provider: ethers.providers.Web3Provider) => {
-    if (!provider) {
-      showToast(
-        ToastType.DESTRUCTIVE,
-        "No provider found. Please try again later."
-      );
-      return;
-    }
-
-    const token = await getToken(provider);
-
-    if (!token || !isValidTokenFormat(token)) {
-      return;
-    }
+  connectAccount: async (set: any, get: any, account: string) => {
+    const { token } = get();
 
     try {
-      showToast(ToastType.INFO, "Getting accounts...");
-
-      if (!(await isTenChain())) {
-        showToast(ToastType.DESTRUCTIVE, "Please connect to the TEN chain.");
+      if (!token) {
+        showToast(
+          ToastType.INFO,
+          "Encryption token is required to connect an account."
+        );
         return;
       }
 
-      const accounts = await provider.listAccounts();
+      const authenticated = await ethService.authenticateWithGateway(
+        token,
+        account
+      );
 
-      if (accounts.length === 0) {
-        showToast(ToastType.DESTRUCTIVE, "No MetaMask accounts found.");
-        return [];
+      if (authenticated) {
+        showToast(ToastType.SUCCESS, "Account authenticated!");
+
+        set((state: any) => ({
+          accounts:
+            state.accounts?.map((acc: Account) =>
+              acc.name === account ? { ...acc, connected: true } : acc
+            ) || null,
+          walletConnected: true,
+        }));
+      } else {
+        showToast(ToastType.DESTRUCTIVE, "Account authentication failed.");
       }
-      showToast(ToastType.SUCCESS, "Accounts found!");
-
-      return ethService.formatAccounts(accounts, provider, token);
-    } catch (error) {
-      console.error(error);
-      showToast(ToastType.DESTRUCTIVE, "An error occurred. Please try again.");
-      throw error;
+    } catch (error: any) {
+      showToast(ToastType.DESTRUCTIVE, "Account authentication failed.");
     }
   },
 
   authenticateWithGateway: async (token: string, account: string) => {
     try {
-      return await authenticateAccountWithTenGatewayEIP712(token, account);
+      return await ethService.authenticateAccountWithTenGatewayEIP712(
+        token,
+        account
+      );
     } catch (error) {
       showToast(
         ToastType.DESTRUCTIVE,
         `Error authenticating account: ${account}`
       );
+      return false;
+    }
+  },
+
+  switchToTenNetwork: async () => {
+    if (!ethereum) {
+      throw "No ethereum object found";
+    }
+    try {
+      await ethereum.request({
+        method: requestMethods.switchNetwork,
+        params: [{ chainId: tenChainIDHex }],
+      });
+      return 0;
+    } catch (switchError: any) {
+      showToast(
+        ToastType.DESTRUCTIVE,
+        `switchToTenNetwork: ${switchError.code}`
+      );
+      return switchError.code;
+    }
+  },
+
+  connectAccounts: async () => {
+    if (!ethereum) {
+      throw "No ethereum object found";
+    }
+    try {
+      return await ethereum.request({
+        method: requestMethods.connectAccounts,
+      });
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+
+  getSignature: async (account: string, data: any) => {
+    if (!ethereum) {
+      throw "No ethereum object found";
+    }
+    try {
+      return await ethereum.request({
+        method: requestMethods.signTypedData,
+        params: [account, JSON.stringify(data)],
+      });
+    } catch (error) {
+      console.error(error);
+      throw "Failed to get signature";
+    }
+  },
+
+  getToken: async (provider: ethers.providers.Web3Provider) => {
+    if (!provider?.send) {
+      return null;
+    }
+    try {
+      if (await isTenChain()) {
+        const token = await provider.send(requestMethods.getStorageAt, [
+          userStorageAddress,
+          getRandomIntAsString(0, 1000),
+          null,
+        ]);
+        return token;
+      } else {
+        return null;
+      }
+    } catch (e: any) {
+      toast({
+        title: "Invalid Encrypted Token",
+        variant: ToastType.DESTRUCTIVE,
+        description:
+          e instanceof Error
+            ? e.message
+            : e?.data?.message?.includes("not found")
+              ? "Please restart the process to get a new encryption token by removing TEN Testnet from your wallet and reconnecting."
+              : "An error occurred. Please try again.}",
+      });
+      console.error(e);
+      throw e;
+    }
+  },
+
+  addNetworkToMetaMask: async (rpcUrls: string[]) => {
+    if (!ethereum) {
+      throw "No ethereum object found";
+    }
+    try {
+      await ethereum.request({
+        method: requestMethods.addNetwork,
+        params: [
+          {
+            chainId: tenChainIDHex,
+            chainName: tenNetworkName,
+            nativeCurrency,
+            rpcUrls,
+            blockExplorerUrls: [tenscanAddress],
+          },
+        ],
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+
+  authenticateAccountWithTenGatewayEIP712: async (
+    token: string,
+    account: string
+  ): Promise<any> => {
+    if (!token) {
+      return showToast(
+        ToastType.INFO,
+        "Encryption token not found. Please try again later."
+      );
+    }
+
+    try {
+      const isAuthenticated = await accountIsAuthenticated(token, account);
+      if (isAuthenticated.status) {
+        return {
+          status: true,
+          message: "Account already authenticated",
+        };
+      }
+      const data = {
+        ...typedData,
+        message: {
+          ...typedData.message,
+          "Encryption Token": token,
+        },
+      };
+      const signature = await ethService.getSignature(account, data);
+
+      return await authenticateUser(token, {
+        signature,
+        address: account,
+      });
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  revokeAccounts: async (set: any, get: any) => {
+    const { token } = get();
+    if (!token) {
+      showToast(
+        ToastType.INFO,
+        "Encryption token is required to revoke accounts"
+      );
+      return;
+    }
+    const revokeResponse = await revokeAccountsApi(token);
+    if (revokeResponse === ToastType.SUCCESS) {
+      showToast(ToastType.DESTRUCTIVE, "Accounts revoked!");
+      set({
+        accounts: null,
+        walletConnected: false,
+        token: "",
+        loading: false,
+      });
     }
   },
 };

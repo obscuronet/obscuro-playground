@@ -123,7 +123,7 @@ jobs:
       - name: "Build and Push Docker Image"
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            --build-arg NEXT_PUBLIC_API_HOST_ENVIRONMENT="${{ github.event.inputs.testnet_type }}"" \
+            --build-arg NEXT_PUBLIC_API_HOST_ENVIRONMENT="${{ github.event.inputs.testnet_type }}" \
             --build-arg NEXT_PUBLIC_NETWORK_NAME="${{ env.NETWORK_NAME }}" \
             --build-arg NEXT_PUBLIC_TENSCAN_URL="${{ env.TENSCAN_URL }}" \
             --build-arg NEXT_PUBLIC_GATEWAY_URL="${{ env.GATEWAY_URL }}" \

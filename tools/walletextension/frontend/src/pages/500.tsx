@@ -1,32 +1,8 @@
-import { ErrorType } from "@/types/interfaces";
-import Error from "./_error";
+import React from "react";
+import Custom500Error from "@repo/ui/components/common/404";
 
-function Custom500Error({
-  customPageTitle,
-  message,
-  showRedirectText,
-  redirectText,
-  err,
-  redirectLink,
-  children,
-}: ErrorType) {
-  return (
-    <Error
-      heading={"Oops! Something went wrong."}
-      message={
-        message ||
-        "We're experiencing technical difficulties. Please try again later."
-      }
-      statusText={customPageTitle || `An Error occured`}
-      statusCode={500}
-      showRedirectText={showRedirectText || true}
-      redirectText={redirectText || "Home Page"}
-      err={err}
-      redirectLink={redirectLink}
-    >
-      {children}
-    </Error>
-  );
-}
+const Custom500 = () => {
+  return <Custom500Error />;
+};
 
-export default Custom500Error;
+export default Custom500;

@@ -1,51 +1,39 @@
 # Use an official Node.js LTS version as a base image
-FROM node:20-alpine AS base
+FROM node:18-buster AS base
+
 # Install pnpm
 RUN npm install -g pnpm
 
+# Set the working directory
+WORKDIR /home/obscuro/go-obscuro/
 
+# Copy the entire project
+COPY . .
+
+# Install dependencies for the entire project
+RUN pnpm install
+
+# Set the working directory for the frontend
+WORKDIR /home/obscuro/go-obscuro/tools/walletextension/frontend
+
+# Install dependencies specific to the frontend
+RUN pnpm install --filter ./tools/walletextension/frontend...
+
+# Build the Next.js app (if needed)
+# RUN pnpm run build
+
+# Set environment variables
 ARG NEXT_PUBLIC_NETWORK_NAME
 ARG NEXT_PUBLIC_TENSCAN_URL
 ARG NEXT_PUBLIC_GATEWAY_URL
 ARG NEXT_PUBLIC_API_HOST_ENVIRONMENT
-
 ENV NEXT_PUBLIC_NETWORK_NAME=$NEXT_PUBLIC_NETWORK_NAME
 ENV NEXT_PUBLIC_TENSCAN_URL=$NEXT_PUBLIC_TENSCAN_URL
 ENV NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
 ENV NEXT_PUBLIC_API_HOST_ENVIRONMENT=${NEXT_PUBLIC_API_HOST_ENVIRONMENT}
 
-# Set the working directory
-WORKDIR /usr/src/app
-
-# Copy the necessary files to the working directory
-COPY tools/walletextension/frontend/ .
-
-# Install dependencies
-RUN pnpm ci
-
-# Build the Next.js app
-RUN pnpm run build
-
-# Reduce the size of the final image by using a lighter base image
-FROM node:20-alpine AS runner
-
-# Set the working directory
-WORKDIR /usr/src/app
-
-# Copy only the necessary files from the build stage
-COPY --from=base /usr/src/app/.next ./.next
-COPY --from=base /usr/src/app/public ./public
-COPY --from=base /usr/src/app/package*.json ./
-
-# Install production dependencies
-RUN pnpm ci --production
-
-
-# Set the environment variables
-ENV PORT=80
-
 # Expose the port
 EXPOSE 80
 
 # Start the application
-CMD ["pnpm", "start"]
+CMD ["pnpm", "run", "start"]

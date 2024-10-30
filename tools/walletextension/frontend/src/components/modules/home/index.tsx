@@ -1,11 +1,11 @@
 import React from "react";
-import { useWalletConnection } from "../../providers/wallet-provider";
 import Connected from "./connected";
 import Disconnected from "./disconnected";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@repo/ui/components/shared/skeleton";
+import useWalletStore from "@/stores/wallet-store";
 
 const Home = () => {
-  const { walletConnected, loading } = useWalletConnection();
+  const { walletConnected, loading } = useWalletStore();
 
   return (
     <div className="w-[800px] mx-auto">

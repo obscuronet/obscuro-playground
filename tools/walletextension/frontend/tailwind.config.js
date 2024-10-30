@@ -6,6 +6,7 @@ module.exports = {
     "./src/components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "../../../packages/ui/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {
@@ -33,6 +34,10 @@ module.exports = {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
         },
         warning: {
           DEFAULT: "hsl(var(--warning))",

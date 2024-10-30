@@ -1,7 +1,7 @@
 import React from "react";
 import NextErrorComponent from "next/error";
 import Link from "next/link";
-import { ErrorType } from "@/types/interfaces";
+import { ErrorType } from "@repo/ui/lib/interfaces/ui";
 
 function ErrorMessage({
   statusText,

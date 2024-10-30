@@ -11,7 +11,7 @@ function Skeleton({
   height?: number | string;
 }) {
   return (
-    <div
+    <span
       className={cn(
         "animate-pulse rounded-md bg-muted",
         width && `w-${width}`,

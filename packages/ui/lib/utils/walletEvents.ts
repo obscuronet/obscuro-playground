@@ -41,7 +41,7 @@ export const setupEventListeners = (
       toast({
         title: "Wrong Network",
         description: "Please switch to the correct network.",
-        variant: ToastType.WARNING,
+        variant: ToastType.INFO,
       });
     } else {
       toast({

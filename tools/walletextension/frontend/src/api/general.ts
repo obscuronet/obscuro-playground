@@ -1,4 +1,4 @@
-import { ResponseDataInterface } from "@/types/interfaces";
+import { ResponseDataInterface } from "@repo/ui/lib/types/common";
 import { httpRequest } from ".";
 import { pathToUrl } from "@/routes/router";
 import { apiRoutes } from "@/routes";
