@@ -252,7 +252,7 @@ func performHandshake(enclaveConfig enclaveconfig.EnclaveConfig, edbCfg *Config,
 	manifest := &manifest{
 		SQL:   createManifestFormat(string(edbInitFile)),
 		Cert:  caCertPEM,
-		Debug: debugMode,
+		Debug: true,
 	}
 	manifestJSON, err := json.Marshal(manifest)
 	if err != nil {
