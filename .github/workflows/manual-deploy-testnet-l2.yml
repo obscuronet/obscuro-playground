@@ -228,7 +228,8 @@ jobs:
             && chown obscurouser:obscurouser /home/obscurouser/edb-connect.sh \
             && chmod u+x /home/obscurouser/edb-connect.sh \
             && docker network create --driver bridge node_network || true \
-            && mkdir -p /home/obscuro/promtail \
+            && mkdir -p /home/obscuro/metrics \
+            && echo "AZURE_METRICS_PROMETHEUS_ENDPOINT=http://localhost:9090/metrics" | tee -a /etc/environment \
             && echo "
             server:
               http_listen_port: 9080
@@ -262,16 +263,35 @@ jobs:
                   target_label: \"job\"
                 - replacement: ${{ matrix.host_id }}-${{ github.event.inputs.testnet_type }}-${{ GITHUB.RUN_NUMBER }}
                   target_label: "node_name"
-            " > /home/obscuro/promtail/promtail-config.yaml \
+            " > /home/obscuro/metrics/promtail-config.yaml \
+            && echo "
+            scrape_configs:
+            - job_name: 'cadvisor'
+              static_configs:
+              - targets: ['host.docker.internal:8080']
+                      - job_name: flog_scrape
+                        docker_sd_configs:
+                          - host: unix:///var/run/docker.sock
+                            refresh_interval: 5s
+              relabel_configs:
+                - source_labels: [\"__meta_docker_container_name\"]
+                  regex: \"/(.*)\"
+                  target_label: \"container\"
+                  target_label: \"job\"
+                - replacement: ${{ matrix.host_id }}-${{ github.event.inputs.testnet_type }}-${{ GITHUB.RUN_NUMBER }}
+                  target_label: "node_name"
+            " > /home/obscuro/metrics/prometheus.yml \
             && docker run -d --name promtail \
               --network node_network \
               -e HOSTNAME=${{ matrix.host_id }}-${{ github.event.inputs.testnet_type }}-${{ GITHUB.RUN_NUMBER }} \
               -v /var/log:/var/log \
-              -v /home/obscuro/promtail:/etc/promtail \
+              -v /home/obscuro/metrics:/etc/promtail \
               -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
               -v /var/run/docker.sock:/var/run/docker.sock \
               grafana/promtail:latest \
               -config.file=/etc/promtail/promtail-config.yaml -config.expand-env=true \
+            && docker run -d --name=prometheus -p 9090:9090 -v /home/obscuro/metrics/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus \
+            &&  docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:rw --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --publish=8080:8080 --detach=true --name=cadvisor google/cadvisor:latest \
             && cd /home/obscuro/go-obscuro/ \
             && sudo go run /home/obscuro/go-obscuro/go/node/cmd  \
                -is_genesis=${{ matrix.is_genesis }} \
