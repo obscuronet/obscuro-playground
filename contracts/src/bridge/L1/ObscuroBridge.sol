@@ -87,7 +87,7 @@ contract ObscuroBridge is
         address asset,
         uint256 amount,
         address receiver
-    ) external payable override {
+    ) external override {
         require(amount > 0, "Attempting empty transfer.");
         require(
             hasRole(ERC20_TOKEN_ROLE, asset),

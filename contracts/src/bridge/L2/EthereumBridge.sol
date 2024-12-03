@@ -73,7 +73,7 @@ contract EthereumBridge is
         address asset,
         uint256 amount,
         address receiver
-    ) external payable {
+    ) external {
         require(hasTokenMapping(asset), "No mapping for token.");
 
         WrappedERC20 token = wrappedTokens[asset];

@@ -68,6 +68,6 @@ abstract contract CrossChainEnabledObscuro is Initializable {
         bytes memory payload = abi.encode(
             ICrossChainMessenger.CrossChainCall(target, message, gas)
         );
-        messageBus.publishMessage{value: msg.value}(nonce++, topic, payload, consistencyLevel);
+        messageBus.publishMessage(nonce++, topic, payload, consistencyLevel);
     }
 }

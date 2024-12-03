@@ -26,7 +26,7 @@ interface IBridge {
         address asset,
         uint256 amount,
         address receiver
-    ) external payable;
+    ) external;
 
     // This function is called to retrieve assets that have been sent on the other layer.
     // In the basic implementation it is only callable from the CrossChainMessenger when a message is

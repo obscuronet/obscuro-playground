@@ -41,7 +41,7 @@ interface IMessageBus {
         uint32 topic,
         bytes calldata payload, 
         uint8 consistencyLevel
-    ) external payable returns (uint64 sequence);
+    ) external returns (uint64 sequence);
 
     function sendValueToL2(
         address receiver,
