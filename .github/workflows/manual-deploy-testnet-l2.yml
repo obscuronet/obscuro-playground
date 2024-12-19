@@ -25,6 +25,11 @@ on:
         required: true
         default: 3
         type: number
+      ha_enabled:
+        description: 'Enable High Availability'
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   build:
@@ -209,7 +214,7 @@ jobs:
             --public-ip-address-dns-name "obscuronode-${{ matrix.host_id }}-${{ github.event.inputs.testnet_type }}" \
             --tags deploygroup=ObscuroNode-${{ github.event.inputs.testnet_type }}-${{ GITHUB.RUN_NUMBER }}  ${{ vars.AZURE_DEPLOY_GROUP_L2 }}=true \
             --vnet-name ${{ github.event.inputs.testnet_type }}-virtual-network --subnet ${{ github.event.inputs.testnet_type }}-sub-network \
-            --size Standard_DC8_v2 --storage-sku StandardSSD_LRS --image ObscuroConfUbuntu \
+            --size Standard_DC8s_v3 --storage-sku StandardSSD_LRS --image ObscuroConfUbuntu \
             --public-ip-sku Standard --authentication-type password
 
       - name: 'Open Obscuro node-${{ matrix.host_id }} ports on Azure'
