@@ -135,7 +135,7 @@ jobs:
           - node_l1_ws_lookup: L1_WS_URL_2
             host_id: 2
           # sequencer has an HA setup with 2 enclaves
-          - num_enclaves: 1
+          - num_enclaves: 2
             host_id: 0
           - num_enclaves: 1
             host_id: 1
