@@ -177,6 +177,7 @@ func (s *Simulation) bridgeFundingToTen() {
 		panic(err)
 	}
 
+	transactions := make(types.Transactions, 0)
 	for idx, w := range wallets {
 		opts, err := bind.NewKeyedTransactorWithChainID(w.PrivateKey(), w.ChainID())
 		if err != nil {
@@ -184,27 +185,26 @@ func (s *Simulation) bridgeFundingToTen() {
 		}
 		opts.Value = value
 
-		_, err = busCtr.SendValueToL2(opts, receivers[idx], value)
+		tx, err := busCtr.SendValueToL2(opts, receivers[idx], value)
 		if err != nil {
 			panic(err)
 		}
+		transactions = append(transactions, tx)
 	}
 
-	time.Sleep(15 * time.Second)
-	// todo - fix the wait group, for whatever reason it does not find a receipt...
-	/*wg := sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	for _, tx := range transactions {
 		wg.Add(1)
 		transaction := tx
 		go func() {
 			defer wg.Done()
-			err := testcommon.AwaitReceiptEth(s.ctx, s.RPCHandles.RndEthClient(), transaction.Hash(), 20*time.Second)
+			_, err := testcommon.AwaitReceiptEth(context.Background(), s.RPCHandles.RndEthClient().EthClient(), transaction.Hash(), 2*time.Minute)
 			if err != nil {
 				panic(err)
 			}
 		}()
 	}
-	wg.Wait()*/
+	wg.Wait()
 }
 
 // We subscribe to logs on every client for every wallet.
