@@ -196,7 +196,7 @@ When a block from `L1` is processed by the `enclave` and transactions inside of 
 
 When a transaction on the `L2` results in `LogMessagePublished`, the event will automatically be added to the `Rollup header` by the `enclave`. Then the management contract will submit them to the `MessageBus` or they will directly be.
 
-![Diagram not found](./resources/PublishFromTen.svg)
+![Diagram not found](./resources/PublishFromObscuro.svg)
 
 > **_NOTE:_** **The messages must not be accessible unless** the challenge period has passed! On top of that the block where the message is submitted to L1 must have confirmations equal to `consistencyLevel` before the message is released. Those are simply counted on-chain as "confirmations" is meaningless for TEN L2.  
 
@@ -311,10 +311,10 @@ There will be the following topics initially:
 ---
 
 **Diagram of the bridge process that happens on Ten's Layer 2 when a deposit is created**
-![Sequence Diagram not available](./resources/TenL2_MessageBus_deposit_Diagram.svg)
+![Sequence Diagram not available](./resources/ObscuroL2_MessageBus_deposit_Diagram.svg)
 
 **Diagram of the process to withdraw the assets from the bridge contract on Ten's Layer 2**
-![Sequence Diagram not available](./resources/TenL2_Bridge_withdraw_Diagram.svg)
+![Sequence Diagram not available](./resources/ObscuroL2_Bridge_withdraw_Diagram.svg)
 
 The API to transfer assets from the perspective of the user is the same on both layers. The process is as follows:
 
