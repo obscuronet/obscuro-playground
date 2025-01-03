@@ -94,8 +94,7 @@ the mechanics.*
 
 #### 5. Mempool 
 
-The mempool is the component which handles the incoming transactions and is responsible for selecting which transactions 
-to include in the current batch and pick the order.
+Mempool is a special storage area on the blockchain containing all unconfirmed transactions waiting to be included. When a user submits a transaction, it first enters the mempool and is awaiting processing. Each node on the blockchain network maintains its mempool, which serves as a buffer between sending a transaction and its inclusion in the block.
 
 The big advantage of running the mempool inside the secure Enclave is that the ordering of transactions cannot be gamed by the aggregator, 
 which makes MEV much more difficult.
