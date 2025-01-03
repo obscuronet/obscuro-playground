@@ -53,7 +53,18 @@ func (api *BlockChainAPI) BlockNumber() hexutil.Uint64 {
 }
 
 func (api *BlockChainAPI) GetBalance(ctx context.Context, address gethcommon.Address, blockNrOrHash rpc.BlockNumberOrHash) (*hexutil.Big, error) {
-	return ExecAuthRPC[hexutil.Big](
+	user, err := extractUserForRequest(ctx, api.we)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add detailed logging
+	api.we.Logger().Info("GetBalance request received",
+		"address", address.Hex(),
+		"blockNrOrHash", blockNrOrHash,
+		"user", user)
+
+	balance, err := ExecAuthRPC[hexutil.Big](
 		ctx,
 		api.we,
 		&AuthExecCfg{
@@ -69,6 +80,21 @@ func (api *BlockChainAPI) GetBalance(ctx context.Context, address gethcommon.Add
 		address,
 		blockNrOrHash,
 	)
+
+	// Log the result
+	if err != nil {
+		api.we.Logger().Error("GetBalance request failed",
+			"address", address.Hex(),
+			"blockNrOrHash", blockNrOrHash,
+			"error", err)
+	} else {
+		api.we.Logger().Info("GetBalance request completed",
+			"address", address.Hex(),
+			"blockNrOrHash", blockNrOrHash,
+			"balance", balance)
+	}
+
+	return balance, err
 }
 
 // Result structs for GetProof
