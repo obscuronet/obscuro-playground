@@ -121,12 +121,7 @@ jobs:
 
       - name: 'Build and Push Docker Image'
         run: |
-          DOCKER_BUILDKIT=1 docker build \
-            --build-arg NEXT_PUBLIC_NETWORK_NAME=${{ env.NETWORK_NAME }} \
-            --build-arg NEXT_PUBLIC_TENSCAN_URL=${{ env.TENSCAN_URL }} \
-            --build-arg NEXT_PUBLIC_GATEWAY_URL=${{ env.GATEWAY_URL }} \
-            -t ${{ env.DOCKER_BUILD_TAG_GATEWAY_FE }} \
-            -f ./tools/walletextension/frontend/Dockerfile .
+          DOCKER_BUILDKIT=1 docker build --build-arg NEXT_PUBLIC_NETWORK_NAME=${{ env.NETWORK_NAME }} --build-arg NEXT_PUBLIC_TENSCAN_URL=${{ env.TENSCAN_URL }} --build-arg NEXT_PUBLIC_GATEWAY_URL=${{ env.GATEWAY_URL }} -t ${{ env.DOCKER_BUILD_TAG_GATEWAY_FE }} -f ./tools/walletextension/frontend/Dockerfile .
           docker push ${{ env.DOCKER_BUILD_TAG_GATEWAY_FE }}
 
       - name: 'Deploy Gateway FE to Azure Container Instances'
