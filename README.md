@@ -347,4 +347,4 @@ curl -X POST 127.0.0.1:80  -H 'Content-Type: application/json' \
 
 ## Community 
 
-Development is discussed by the team and the community on [discord](https://discord.com/channels/916052669955727371/945360340613484684) 
+Development is discussed by the team and the community on [discord](https://discord.com/invite/tenprotocol)
