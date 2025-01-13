@@ -42,7 +42,7 @@ const (
 )
 
 // this is how long the node waits to receive the second batch
-var startMempoolTimeout = 90 * time.Second
+var startMempoolTimeout = 90 * time.Minute
 
 // TxPool is an obscuro wrapper around geths transaction pool
 type TxPool struct {
