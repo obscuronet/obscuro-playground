@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ten-protocol/go-ten/go/common/log"
 
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
@@ -36,16 +38,18 @@ import (
 	"github.com/ten-protocol/go-ten/go/ethadapter/mgmtcontractlib"
 )
 
-const SecondsPerSlot = uint64(12)
+type (
+	Latency func() time.Duration
+)
 
 type L1Network interface {
 	// BroadcastBlock - send the block and the parent to make sure there are no gaps
-	BroadcastBlock(b common.EncodedL1Block, p common.EncodedL1Block)
+	BroadcastBlock(b EncodedL1Block, p EncodedL1Block)
 	BroadcastTx(tx *types.Transaction)
 }
 
 type MiningConfig struct {
-	PowTime      common.Latency
+	PowTime      Latency
 	LogFile      string
 	L1BeaconPort int
 }
@@ -84,12 +88,10 @@ type Node struct {
 
 	p2pCh       chan *types.Block       // this is where blocks received from peers are dropped
 	miningCh    chan *types.Block       // this is where blocks created by the mining setup of the current node are dropped
-	canonicalCh chan *types.Block       // this is where the main processing routine drops blocks that are canonical
+	canonicalCh chan *types.Header      // this is where the main processing routine drops blocks that are canonical
 	mempoolCh   chan *types.Transaction // where l1 transactions to be published in the next block are added
 
 	// internal
-	headInCh         chan bool
-	headOutCh        chan *types.Block
 	erc20ContractLib erc20contractlib.ERC20ContractLib
 	mgmtContractLib  mgmtcontractlib.MgmtContractLib
 
@@ -178,7 +180,7 @@ func (m *Node) TransactionByHash(hash gethcommon.Hash) (*types.Transaction, bool
 			}
 		}
 
-		blk, err = m.BlockResolver.FetchBlock(context.Background(), blk.ParentHash())
+		blk, err = m.BlockResolver.FetchFullBlock(context.Background(), blk.ParentHash())
 		if err != nil {
 			return nil, false, fmt.Errorf("could not retrieve parent block. Cause: %w", err)
 		}
@@ -226,16 +228,17 @@ func (m *Node) FetchLastBatchSeqNo(gethcommon.Address) (*big.Int, error) {
 		return nil, err
 	}
 
-	for currentBlock := startingBlock; currentBlock.NumberU64() != 0; {
-		currentBlock, err = m.BlockByHash(currentBlock.Header().ParentHash)
+	for currentBlock := startingBlock; currentBlock.Number.Uint64() != 0; {
+		cb, err := m.BlockByHash(currentBlock.ParentHash)
 		if err != nil {
 			m.logger.Error("Error fetching block by hash", "error", err)
 			break
 		}
-		rollup := m.getRollupFromBlock(currentBlock)
+		rollup := m.getRollupFromBlock(cb)
 		if rollup != nil {
 			return big.NewInt(int64(rollup.Header.LastBatchSeqNo)), nil
 		}
+		currentBlock = cb.Header()
 	}
 	// the first batch is number 1
 	return big.NewInt(int64(common.L2GenesisSeqNo)), nil
@@ -266,11 +269,13 @@ func (m *Node) BlockNumber() (uint64, error) {
 	return blk.NumberU64(), nil
 }
 
-func (m *Node) BlockByNumber(n *big.Int) (*types.Block, error) {
-	if n.Int64() == 0 {
-		return MockGenesisBlock, nil
+func (m *Node) HeaderByNumber(n *big.Int) (*types.Header, error) {
+	if n == nil {
+		return m.FetchHeadBlock()
 	}
-	// TODO this should be a method in the resolver
+	if n.Int64() == 0 {
+		return MockGenesisBlock.Header(), nil
+	}
 	blk, err := m.BlockResolver.FetchHeadBlock(context.Background())
 	if err != nil {
 		if errors.Is(err, errutil.ErrNotFound) {
@@ -280,10 +285,10 @@ func (m *Node) BlockByNumber(n *big.Int) (*types.Block, error) {
 	}
 	for !bytes.Equal(blk.ParentHash().Bytes(), (common.L1BlockHash{}).Bytes()) {
 		if blk.NumberU64() == n.Uint64() {
-			return blk, nil
+			return blk.Header(), nil
 		}
 
-		blk, err = m.BlockResolver.FetchBlock(context.Background(), blk.ParentHash())
+		blk, err = m.BlockResolver.FetchFullBlock(context.Background(), blk.ParentHash())
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve parent for block in chain. Cause: %w", err)
 		}
@@ -291,20 +296,28 @@ func (m *Node) BlockByNumber(n *big.Int) (*types.Block, error) {
 	return nil, ethereum.NotFound
 }
 
+func (m *Node) HeaderByHash(id gethcommon.Hash) (*types.Header, error) {
+	blk, err := m.BlockResolver.FetchFullBlock(context.Background(), id)
+	if err != nil {
+		return nil, fmt.Errorf("block could not be retrieved. Cause: %w", err)
+	}
+	return blk.Header(), nil
+}
+
 func (m *Node) BlockByHash(id gethcommon.Hash) (*types.Block, error) {
-	blk, err := m.BlockResolver.FetchBlock(context.Background(), id)
+	blk, err := m.BlockResolver.FetchFullBlock(context.Background(), id)
 	if err != nil {
 		return nil, fmt.Errorf("block could not be retrieved. Cause: %w", err)
 	}
 	return blk, nil
 }
 
-func (m *Node) FetchHeadBlock() (*types.Block, error) {
+func (m *Node) FetchHeadBlock() (*types.Header, error) {
 	block, err := m.BlockResolver.FetchHeadBlock(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve head block. Cause: %w", err)
 	}
-	return block, nil
+	return block.Header(), nil
 }
 
 func (m *Node) Info() ethadapter.Info {
@@ -313,7 +326,7 @@ func (m *Node) Info() ethadapter.Info {
 	}
 }
 
-func (m *Node) IsBlockAncestor(block *types.Block, proof common.L1BlockHash) bool {
+func (m *Node) IsBlockAncestor(block *types.Header, proof common.L1BlockHash) bool {
 	return m.BlockResolver.IsBlockAncestor(context.Background(), block, proof)
 }
 
@@ -387,12 +400,12 @@ func (m *Node) Start() {
 	if err != nil {
 		m.logger.Crit("Failed to store block")
 	}
-	head := m.setHead(MockGenesisBlock)
+	head := m.setHead(MockGenesisBlock.Header())
 
 	for {
 		select {
 		case p2pb := <-m.p2pCh: // Received from peers
-			_, err := m.BlockResolver.FetchBlock(context.Background(), p2pb.Hash())
+			_, err := m.BlockResolver.FetchFullBlock(context.Background(), p2pb.Hash())
 			// only process blocks if they haven't been processed before
 			if err != nil {
 				if errors.Is(err, errutil.ErrNotFound) {
@@ -405,70 +418,68 @@ func (m *Node) Start() {
 		case mb := <-m.miningCh: // Received from the local mining
 			head = m.processBlock(mb, head)
 			if bytes.Equal(head.Hash().Bytes(), mb.Hash().Bytes()) { // Only broadcast if it's the new head
-				p, err := m.BlockResolver.FetchBlock(context.Background(), mb.ParentHash())
+				p, err := m.BlockResolver.FetchFullBlock(context.Background(), mb.ParentHash())
 				if err != nil {
 					panic(fmt.Errorf("could not retrieve parent. Cause: %w", err))
 				}
-				encodedBlock, err := common.EncodeBlock(mb)
+				encodedBlock, err := EncodeBlock(mb)
 				if err != nil {
 					panic(fmt.Errorf("could not encode block. Cause: %w", err))
 				}
-				encodedParentBlock, err := common.EncodeBlock(p)
+				encodedParentBlock, err := EncodeBlock(p)
 				if err != nil {
 					panic(fmt.Errorf("could not encode parent block. Cause: %w", err))
 				}
 				m.Network.BroadcastBlock(encodedBlock, encodedParentBlock)
 			}
-		case <-m.headInCh:
-			m.headOutCh <- head
 		case <-m.exitCh:
 			return
 		}
 	}
 }
 
-func (m *Node) processBlock(b *types.Block, head *types.Block) *types.Block {
+func (m *Node) processBlock(b *types.Block, head *types.Header) *types.Header {
 	err := m.BlockResolver.StoreBlock(context.Background(), b, nil)
 	if err != nil {
 		m.logger.Crit("Failed to store block. Cause: %w", err)
 	}
 
-	_, err = m.BlockResolver.FetchBlock(context.Background(), b.Header().ParentHash)
+	_, err = m.BlockResolver.FetchFullBlock(context.Background(), b.Header().ParentHash)
 	// only proceed if the parent is available
 	if err != nil {
 		if errors.Is(err, errutil.ErrNotFound) {
-			m.logger.Info(fmt.Sprintf("Parent block not found=b_%d", common.ShortHash(b.Header().ParentHash)))
+			m.logger.Info(fmt.Sprintf("Parent block not found=b_%s", b.Header().ParentHash))
 			return head
 		}
 		m.logger.Crit("Could not fetch block parent. Cause: %w", err)
 	}
 
 	// Ignore superseded blocks
-	if b.NumberU64() <= head.NumberU64() {
+	if b.NumberU64() <= head.Number.Uint64() {
 		return head
 	}
 
 	// Check for Reorgs
-	if !m.BlockResolver.IsAncestor(context.Background(), b, head) {
+	if !m.BlockResolver.IsAncestor(context.Background(), b.Header(), head) {
 		m.stats.L1Reorg(m.l2ID)
-		fork, err := LCA(context.Background(), head, b, m.BlockResolver)
+		fork, err := gethutil.LCA(context.Background(), head, b.Header(), m.BlockResolver)
 		if err != nil {
 			m.logger.Error("Should not happen.", log.ErrKey, err)
 			return head
 		}
 		m.logger.Info(
-			fmt.Sprintf("L1Reorg new=b_%d(%d), old=b_%d(%d), fork=b_%d(%d)", common.ShortHash(b.Hash()), b.NumberU64(), common.ShortHash(head.Hash()), head.NumberU64(), common.ShortHash(fork.CommonAncestor.Hash()), fork.CommonAncestor.Number.Uint64()))
-		return m.setFork(m.BlocksBetween(fork.CommonAncestor, b))
+			fmt.Sprintf("L1Reorg new=b_%s(%d), old=b_%s(%d), fork=b_%s(%d)", b.Hash(), b.NumberU64(), head.Hash(), head.Number.Uint64(), fork.CommonAncestor.Hash(), fork.CommonAncestor.Number.Uint64()))
+		return m.setFork(m.BlocksBetween(fork.CommonAncestor, b.Header()))
 	}
-	if b.NumberU64() > (head.NumberU64() + 1) {
+	if b.NumberU64() > (head.Number.Uint64() + 1) {
 		m.logger.Error("Should not happen. Blocks are skewed")
 	}
 
-	return m.setHead(b)
+	return m.setHead(b.Header())
 }
 
 // Notifies the Miner to start mining on the new block and the aggregator to produce rollups
-func (m *Node) setHead(b *types.Block) *types.Block {
+func (m *Node) setHead(b *types.Header) *types.Header {
 	if atomic.LoadInt32(m.interrupt) == 1 {
 		return b
 	}
@@ -485,7 +496,7 @@ func (m *Node) setHead(b *types.Block) *types.Block {
 	return b
 }
 
-func (m *Node) setFork(blocks []*types.Block) *types.Block {
+func (m *Node) setFork(blocks []*types.Header) *types.Header {
 	head := blocks[len(blocks)-1]
 	if atomic.LoadInt32(m.interrupt) == 1 {
 		return head
@@ -506,7 +517,7 @@ func (m *Node) setFork(blocks []*types.Block) *types.Block {
 
 // P2PReceiveBlock is called by counterparties when there is a block to broadcast
 // All it does is drop the blocks in a channel for processing.
-func (m *Node) P2PReceiveBlock(b common.EncodedL1Block, p common.EncodedL1Block) {
+func (m *Node) P2PReceiveBlock(b EncodedL1Block, p EncodedL1Block) {
 	if atomic.LoadInt32(m.interrupt) == 1 {
 		return
 	}
@@ -537,8 +548,12 @@ func (m *Node) startMining() {
 		case tx := <-m.mempoolCh:
 			mempool = append(mempool, tx)
 
-		case canonicalBlock := <-m.canonicalCh:
+		case canonicalBlockHeader := <-m.canonicalCh:
 			// A new canonical block was found. Start a new round based on that block.
+			canonicalBlock, err := m.BlockResolver.FetchFullBlock(context.Background(), canonicalBlockHeader.Hash())
+			if err != nil {
+				panic(fmt.Errorf("could not fetch block. Cause: %w", err))
+			}
 
 			// remove transactions that are already considered committed
 			mempool = m.removeCommittedTransactions(context.Background(), canonicalBlock, mempool, m.BlockResolver, m.db)
@@ -590,25 +605,25 @@ func (m *Node) Stop() {
 	m.exitCh <- true
 }
 
-func (m *Node) BlocksBetween(blockA *types.Header, blockB *types.Block) []*types.Block {
+func (m *Node) BlocksBetween(blockA *types.Header, blockB *types.Header) []*types.Header {
 	if bytes.Equal(blockA.Hash().Bytes(), blockB.Hash().Bytes()) {
-		return []*types.Block{blockB}
+		return []*types.Header{blockB}
 	}
-	blocks := make([]*types.Block, 0)
+	blocks := make([]*types.Header, 0)
 	tempBlock := blockB
-	var err error
 	for {
 		blocks = append(blocks, tempBlock)
 		if bytes.Equal(tempBlock.Hash().Bytes(), blockA.Hash().Bytes()) {
 			break
 		}
-		tempBlock, err = m.BlockResolver.FetchBlock(context.Background(), tempBlock.ParentHash())
+		tb, err := m.BlockResolver.FetchFullBlock(context.Background(), tempBlock.ParentHash)
 		if err != nil {
 			panic(fmt.Errorf("could not retrieve parent block. Cause: %w", err))
 		}
+		tempBlock = tb.Header()
 	}
 	n := len(blocks)
-	result := make([]*types.Block, n)
+	result := make([]*types.Header, n)
 	for i, block := range blocks {
 		result[n-i-1] = block
 	}
@@ -687,10 +702,8 @@ func NewMiner(
 		interrupt:        new(int32),
 		p2pCh:            make(chan *types.Block),
 		miningCh:         make(chan *types.Block),
-		canonicalCh:      make(chan *types.Block),
+		canonicalCh:      make(chan *types.Header),
 		mempoolCh:        make(chan *types.Transaction),
-		headInCh:         make(chan bool),
-		headOutCh:        make(chan *types.Block),
 		erc20ContractLib: NewERC20ContractLibMock(),
 		mgmtContractLib:  NewMgmtContractLibMock(),
 		logger:           logger,
@@ -714,11 +727,13 @@ func (sub *mockSubscription) Unsubscribe() {
 	sub.node.RemoveSubscription(sub.id)
 }
 
-func (sub *mockSubscription) publish(b *types.Block) {
-	sub.headCh <- b.Header()
+func (sub *mockSubscription) publish(b *types.Header) {
+	if sub.headCh != nil {
+		sub.headCh <- b
+	}
 }
 
-func (sub *mockSubscription) publishAll(blocks []*types.Block) {
+func (sub *mockSubscription) publishAll(blocks []*types.Header) {
 	for _, b := range blocks {
 		sub.publish(b)
 	}

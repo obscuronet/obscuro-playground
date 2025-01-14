@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethlog "github.com/ethereum/go-ethereum/log"
@@ -61,7 +63,7 @@ func NewCrossChainStateMachine(
 ) CrossChainStateMachine {
 	return &crossChainStateMachine{
 		latestRollup: RollupInfo{
-			ForkUID: gethcommon.Hash{},
+			ForkUID: gethutil.EmptyHash,
 			Number:  0,
 		},
 		rollupHistory:   make(map[RollupNumber]RollupInfo),

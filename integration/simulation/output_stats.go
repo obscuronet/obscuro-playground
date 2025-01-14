@@ -80,8 +80,12 @@ func (o *OutputStats) countBlockChain() {
 	}
 
 	// iterate the L1 Blocks and get the rollups
-	for block, _ := l1Node.FetchHeadBlock(); block != nil && !bytes.Equal(block.Hash().Bytes(), (common.L1BlockHash{}).Bytes()); block, _ = l1Node.BlockByHash(block.ParentHash()) {
-		o.incrementStats(block, l1Node)
+	for block, _ := l1Node.FetchHeadBlock(); block != nil && !bytes.Equal(block.Hash().Bytes(), (common.L1BlockHash{}).Bytes()); block, _ = l1Node.HeaderByHash(block.ParentHash) {
+		b, err := l1Node.BlockByHash(block.Hash())
+		if err != nil {
+			panic(err)
+		}
+		o.incrementStats(b, l1Node)
 	}
 }
 

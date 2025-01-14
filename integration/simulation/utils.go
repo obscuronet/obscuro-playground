@@ -119,7 +119,7 @@ func findRollupDups(list []*common.ExtRollup) map[common.L2RollupHash]int {
 	for u, i := range elementCount {
 		if i > 1 {
 			dups[u] = i
-			fmt.Printf("Dup: r_%d\n", common.ShortHash(u))
+			fmt.Printf("Dup: r_%s\n", u.Hex())
 		}
 	}
 	return dups

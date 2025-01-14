@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/ten-protocol/go-ten/go/common/log"
-
 	"github.com/ten-protocol/go-ten/lib/gethfork/debug"
 
 	gethlog "github.com/ethereum/go-ethereum/log"
@@ -53,7 +51,7 @@ func Setup(cfg *Cfg) *os.File {
 		panic(err)
 	}
 
-	testlog = gethlog.New(log.CmpKey, log.TestLogCmp)
+	testlog = gethlog.New()
 	return f
 }
 
@@ -63,5 +61,5 @@ func SetupSysOut() {
 	if err != nil {
 		panic(err)
 	}
-	testlog = gethlog.New(log.CmpKey, log.TestLogCmp)
+	testlog = gethlog.New()
 }

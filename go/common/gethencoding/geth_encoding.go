@@ -11,6 +11,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ten-protocol/go-ten/go/common/log"
 	"github.com/ten-protocol/go-ten/go/enclave/storage"
@@ -288,7 +290,7 @@ func (enc *gethEncodingServiceImpl) CreateEthHeaderForBatch(ctx context.Context,
 
 		gethHeader := types.Header{
 			ParentHash:      convertedParentHash,
-			UncleHash:       gethcommon.Hash{},
+			UncleHash:       gethutil.EmptyHash,
 			Root:            h.Root,
 			TxHash:          h.TxHash,
 			ReceiptHash:     h.ReceiptHash,

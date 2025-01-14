@@ -33,7 +33,6 @@ type (
 	// MainNet aliases
 	L1Address     = common.Address
 	L1BlockHash   = common.Hash
-	L1Block       = types.Block
 	L1Transaction = types.Transaction
 	L1Receipt     = types.Receipt
 	L1Receipts    = types.Receipts

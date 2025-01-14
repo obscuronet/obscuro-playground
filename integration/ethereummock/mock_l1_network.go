@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/ten-protocol/go-ten/go/common/async"
 
 	"github.com/ten-protocol/go-ten/go/common/log"
@@ -44,7 +46,7 @@ func NewMockEthNetwork(avgBlockDuration time.Duration, avgLatency time.Duration,
 }
 
 // BroadcastBlock broadcast a block to the l1 nodes
-func (n *MockEthNetwork) BroadcastBlock(b common.EncodedL1Block, p common.EncodedL1Block) {
+func (n *MockEthNetwork) BroadcastBlock(b EncodedL1Block, p EncodedL1Block) {
 	bl, _ := b.DecodeBlock()
 	for _, m := range n.AllNodes {
 		if m.Info().L2ID != n.CurrentNode.Info().L2ID {
@@ -95,21 +97,21 @@ func printBlock(b *types.Block, m *Node) string {
 			if err != nil {
 				testlog.Logger().Crit("failed to decode rollup")
 			}
-			txs = append(txs, fmt.Sprintf("r_%d(nonce=%d)", common.ShortHash(r.Hash()), tx.Nonce()))
+			txs = append(txs, fmt.Sprintf("r_%s(nonce=%d)", r.Hash(), tx.Nonce()))
 
 		case *common.L1DepositTx:
-			var to uint64
+			var to gethcommon.Address
 			if l1Tx.To != nil {
-				to = common.ShortAddress(*l1Tx.To)
+				to = *l1Tx.To
 			}
-			txs = append(txs, fmt.Sprintf("deposit(%d=%d)", to, l1Tx.Amount))
+			txs = append(txs, fmt.Sprintf("deposit(%s=%d)", to, l1Tx.Amount))
 		}
 	}
-	p, err := m.BlockResolver.FetchBlock(context.Background(), b.ParentHash())
+	p, err := m.BlockResolver.FetchFullBlock(context.Background(), b.ParentHash())
 	if err != nil {
 		testlog.Logger().Crit("Should not happen. Could not retrieve parent", log.ErrKey, err)
 	}
 
-	return fmt.Sprintf(" create b_%d(Height=%d, RollupNonce=%d)[parent=b_%d]. Txs: %v",
-		common.ShortHash(b.Hash()), b.NumberU64(), common.ShortNonce(b.Header().Nonce), common.ShortHash(p.Hash()), txs)
+	return fmt.Sprintf(" create b_%s(Height=%d, RollupNonce=%s)[parent=b_%s]. Txs: %v",
+		b.Hash(), b.NumberU64(), b.Header().Nonce, p.Hash(), txs)
 }

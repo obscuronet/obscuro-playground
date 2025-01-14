@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ten-protocol/go-ten/go/enclave/storage"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ten-protocol/go-ten/go/common"
@@ -13,12 +11,16 @@ import (
 
 // Utilities for working with geth structures
 
+type BlockResolver interface {
+	FetchBlock(ctx context.Context, blockHash common.L1BlockHash) (*types.Header, error)
+}
+
 // EmptyHash is useful for comparisons to check if hash has been set
 var EmptyHash = gethcommon.Hash{}
 
 // LCA - returns the latest common ancestor of the 2 blocks or an error if no common ancestor is found
 // it also returns the blocks that became canonical, and the once that are now the fork
-func LCA(ctx context.Context, newCanonical *types.Header, oldCanonical *types.Header, resolver storage.BlockResolver) (*common.ChainFork, error) {
+func LCA(ctx context.Context, newCanonical *types.Header, oldCanonical *types.Header, resolver BlockResolver) (*common.ChainFork, error) {
 	b, cp, ncp, err := internalLCA(ctx, newCanonical, oldCanonical, resolver, []common.L1BlockHash{}, []common.L1BlockHash{})
 	return &common.ChainFork{
 		NewCanonical:     newCanonical,
@@ -29,9 +31,9 @@ func LCA(ctx context.Context, newCanonical *types.Header, oldCanonical *types.He
 	}, err
 }
 
-func internalLCA(ctx context.Context, newCanonical *types.Header, oldCanonical *types.Header, resolver storage.BlockResolver, canonicalPath []common.L1BlockHash, nonCanonicalPath []common.L1BlockHash) (*types.Header, []common.L1BlockHash, []common.L1BlockHash, error) {
+func internalLCA(ctx context.Context, newCanonical *types.Header, oldCanonical *types.Header, resolver BlockResolver, canonicalPath []common.L1BlockHash, nonCanonicalPath []common.L1BlockHash) (*types.Header, []common.L1BlockHash, []common.L1BlockHash, error) {
 	if newCanonical.Number.Uint64() == common.L1GenesisHeight || oldCanonical.Number.Uint64() == common.L1GenesisHeight {
-		return newCanonical, canonicalPath, nonCanonicalPath, nil
+		return oldCanonical, canonicalPath, nonCanonicalPath, nil
 	}
 	if newCanonical.Hash() == oldCanonical.Hash() {
 		// this is where we reach the common ancestor, which we add to the canonical path

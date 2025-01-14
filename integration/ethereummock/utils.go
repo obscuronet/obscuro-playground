@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ten-protocol/go-ten/go/common"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -25,7 +27,7 @@ func allIncludedTransactions(b *types.Block, r *blockResolverInMem, db TxDB) map
 		return makeMap(b.Transactions())
 	}
 	newMap := make(map[common.TxHash]*types.Transaction)
-	p, err := r.FetchBlock(context.Background(), b.ParentHash())
+	p, err := r.FetchFullBlock(context.Background(), b.ParentHash())
 	if err != nil {
 		panic(fmt.Errorf("should not happen. Could not retrieve parent. Cause: %w", err))
 	}
@@ -55,4 +57,23 @@ func makeMap(txs types.Transactions) map[common.TxHash]*types.Transaction {
 		m[tx.Hash()] = tx
 	}
 	return m
+}
+
+// EncodedL1Block the encoded version of an L1 block.
+type EncodedL1Block []byte
+
+func EncodeBlock(b *types.Block) (EncodedL1Block, error) {
+	encoded, err := rlp.EncodeToBytes(b)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode block to bytes. Cause: %w", err)
+	}
+	return encoded, nil
+}
+
+func (eb EncodedL1Block) DecodeBlock() (*types.Block, error) {
+	b := types.Block{}
+	if err := rlp.DecodeBytes(eb, &b); err != nil {
+		return nil, fmt.Errorf("could not decode block from bytes. Cause: %w", err)
+	}
+	return &b, nil
 }

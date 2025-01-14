@@ -29,7 +29,7 @@ func TestGethSimulation(t *testing.T) {
 
 	simParams := &params.SimParams{
 		NumberOfNodes:         numberOfNodes,
-		AvgBlockDuration:      1 * time.Second,
+		AvgBlockDuration:      2 * time.Second,
 		SimulationTime:        35 * time.Second,
 		L1EfficiencyThreshold: 0.2,
 		Wallets:               wallets,

@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ten-protocol/go-ten/go/common/compression"
 
 	gethcore "github.com/ethereum/go-ethereum/core"
@@ -515,7 +517,7 @@ func (executor *batchExecutor) execResult(ec *BatchExecutionContext) (*ComputedB
 		defer executor.stateDBMutex.Unlock()
 		h, err := ec.stateDB.Commit(batch.Number().Uint64(), deleteEmptyObjects)
 		if err != nil {
-			return gethcommon.Hash{}, fmt.Errorf("commit failure for batch %d. Cause: %w", ec.currentBatch.SeqNo(), err)
+			return gethutil.EmptyHash, fmt.Errorf("commit failure for batch %d. Cause: %w", ec.currentBatch.SeqNo(), err)
 		}
 		trieDB := executor.storage.TrieDB()
 		err = trieDB.Commit(h, false)

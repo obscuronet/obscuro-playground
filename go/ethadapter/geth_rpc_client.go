@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/TwiN/gocache/v2"
+
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -18,8 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethlog "github.com/ethereum/go-ethereum/log"
-
-	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/ten-protocol/go-ten/contracts/generated/ManagementContract"
 	"github.com/ten-protocol/go-ten/go/common"
@@ -45,7 +45,7 @@ type gethRPCClient struct {
 	timeout    time.Duration     // the timeout for connecting to, or communicating with, the L1 node
 	logger     gethlog.Logger
 	rpcURL     string
-	blockCache *lru.Cache[gethcommon.Hash, *types.Block]
+	blockCache *gocache.Cache
 }
 
 // NewEthClientFromURL instantiates a new ethadapter.EthClient that connects to an ethereum node
@@ -57,19 +57,22 @@ func NewEthClientFromURL(rpcURL string, timeout time.Duration, logger gethlog.Lo
 
 	logger.Trace(fmt.Sprintf("Initialized eth node connection - addr: %s", rpcURL))
 
-	// cache recent blocks to avoid re-fetching them (they are often re-used for checking for forks etc.)
-	blkCache, err := lru.New[gethcommon.Hash, *types.Block](_defaultBlockCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("unable to initialize block cache - %w", err)
-	}
-
 	return &gethRPCClient{
 		client:     client,
 		timeout:    timeout,
 		logger:     logger,
 		rpcURL:     rpcURL,
-		blockCache: blkCache,
+		blockCache: newFifoCache(_defaultBlockCacheSize, 5*time.Minute),
 	}, nil
+}
+
+func newFifoCache(nrElem int, ttl time.Duration) *gocache.Cache {
+	cache := gocache.NewCache().WithMaxSize(nrElem).WithEvictionPolicy(gocache.FirstInFirstOut).WithDefaultTTL(ttl)
+	err := cache.StartJanitor()
+	if err != nil {
+		panic("failed to start cache.")
+	}
+	return cache
 }
 
 // NewEthClient instantiates a new ethadapter.EthClient that connects to an ethereum node
@@ -77,25 +80,26 @@ func NewEthClient(ipaddress string, port uint, timeout time.Duration, logger get
 	return NewEthClientFromURL(fmt.Sprintf("ws://%s:%d", ipaddress, port), timeout, logger)
 }
 
-func (e *gethRPCClient) FetchHeadBlock() (*types.Block, error) {
+func (e *gethRPCClient) FetchHeadBlock() (*types.Header, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	return e.client.BlockByNumber(ctx, nil)
+	return e.client.HeaderByNumber(ctx, nil)
 }
 
 func (e *gethRPCClient) Info() Info {
 	return Info{}
 }
 
-func (e *gethRPCClient) BlocksBetween(startingBlock *types.Header, lastBlock *types.Block) []*types.Block {
-	var blocksBetween []*types.Block
+func (e *gethRPCClient) BlocksBetween(startingBlock *types.Header, lastBlock *types.Header) []*types.Header {
+	var blocksBetween []*types.Header
 	var err error
 
-	for currentBlk := lastBlock; currentBlk != nil && !bytes.Equal(currentBlk.Hash().Bytes(), startingBlock.Hash().Bytes()) && !bytes.Equal(currentBlk.ParentHash().Bytes(), gethcommon.HexToHash("").Bytes()); {
-		currentBlk, err = e.BlockByHash(currentBlk.ParentHash())
+	for currentBlk := lastBlock; currentBlk != nil && !bytes.Equal(currentBlk.Hash().Bytes(), startingBlock.Hash().Bytes()) && !bytes.Equal(currentBlk.ParentHash.Bytes(), gethcommon.HexToHash("").Bytes()); {
+		c := currentBlk.ParentHash
+		currentBlk, err = e.HeaderByHash(currentBlk.ParentHash)
 		if err != nil {
-			e.logger.Crit(fmt.Sprintf("could not fetch parent block with hash %s.", currentBlk.ParentHash().String()), log.ErrKey, err)
+			e.logger.Crit(fmt.Sprintf("could not fetch parent block with hash %s.", c.String()), log.ErrKey, err)
 		}
 		blocksBetween = append(blocksBetween, currentBlk)
 	}
@@ -103,28 +107,26 @@ func (e *gethRPCClient) BlocksBetween(startingBlock *types.Header, lastBlock *ty
 	return blocksBetween
 }
 
-func (e *gethRPCClient) IsBlockAncestor(block *types.Block, maybeAncestor common.L1BlockHash) bool {
+func (e *gethRPCClient) IsBlockAncestor(block *types.Header, maybeAncestor common.L1BlockHash) bool {
 	if bytes.Equal(maybeAncestor.Bytes(), block.Hash().Bytes()) || bytes.Equal(maybeAncestor.Bytes(), (common.L1BlockHash{}).Bytes()) {
 		return true
 	}
 
-	if block.Number().Int64() == int64(common.L1GenesisHeight) {
+	if block.Number.Int64() == int64(common.L1GenesisHeight) {
 		return false
 	}
 
-	resolvedBlock, err := e.BlockByHash(maybeAncestor)
+	resolvedAncestorBlock, err := e.HeaderByHash(maybeAncestor)
 	if err != nil {
 		e.logger.Crit(fmt.Sprintf("could not fetch parent block with hash %s.", maybeAncestor.String()), log.ErrKey, err)
 	}
-	if resolvedBlock == nil {
-		if resolvedBlock.Number().Int64() >= block.Number().Int64() {
-			return false
-		}
+	if resolvedAncestorBlock.Number.Int64() >= block.Number.Int64() {
+		return false
 	}
 
-	p, err := e.BlockByHash(block.ParentHash())
+	p, err := e.HeaderByHash(block.ParentHash)
 	if err != nil {
-		e.logger.Crit(fmt.Sprintf("could not fetch parent block with hash %s", block.ParentHash().String()), log.ErrKey, err)
+		e.logger.Crit(fmt.Sprintf("could not fetch parent block with hash %s", block.ParentHash.String()), log.ErrKey, err)
 	}
 	if p == nil {
 		return false
@@ -162,14 +164,13 @@ func (e *gethRPCClient) Nonce(account gethcommon.Address) (uint64, error) {
 }
 
 func (e *gethRPCClient) BlockListener() (chan *types.Header, ethereum.Subscription) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// we do not buffer here, we expect the consumer to always be ready to receive new blocks and not fall behind
-	ch := make(chan *types.Header, 1)
+	ch := make(chan *types.Header)
 	var sub ethereum.Subscription
 	var err error
 	err = retry.Do(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
+		defer cancel()
 		sub, err = e.client.SubscribeNewHead(ctx, ch)
 		if err != nil {
 			e.logger.Warn("could not subscribe for new head blocks", log.ErrKey, err)
@@ -192,17 +193,25 @@ func (e *gethRPCClient) BlockNumber() (uint64, error) {
 	return e.client.BlockNumber(ctx)
 }
 
-func (e *gethRPCClient) BlockByNumber(n *big.Int) (*types.Block, error) {
+func (e *gethRPCClient) HeaderByNumber(n *big.Int) (*types.Header, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	return e.client.BlockByNumber(ctx, n)
+	b, err := e.client.BlockByNumber(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+	return b.Header(), nil
 }
 
-func (e *gethRPCClient) BlockByHash(hash gethcommon.Hash) (*types.Block, error) {
-	block, found := e.blockCache.Get(hash)
+func (e *gethRPCClient) HeaderByHash(hash gethcommon.Hash) (*types.Header, error) {
+	cachedBlock, found := e.blockCache.Get(hash.Hex())
 	if found {
-		return block, nil
+		h, ok := cachedBlock.(types.Header)
+		if !ok {
+			return nil, fmt.Errorf("should not happen. could not cast cached block to header")
+		}
+		return &h, nil
 	}
 
 	// not in cache, fetch from RPC
@@ -213,8 +222,15 @@ func (e *gethRPCClient) BlockByHash(hash gethcommon.Hash) (*types.Block, error) 
 	if err != nil {
 		return nil, err
 	}
-	e.blockCache.Add(hash, block)
-	return block, nil
+	e.blockCache.Set(hash.Hex(), *block.Header())
+	return block.Header(), nil
+}
+
+func (e *gethRPCClient) BlockByHash(hash gethcommon.Hash) (*types.Block, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
+	defer cancel()
+
+	return e.client.BlockByHash(ctx, hash)
 }
 
 func (e *gethRPCClient) CallContract(msg ethereum.CallMsg) ([]byte, error) {
@@ -243,6 +259,7 @@ func (e *gethRPCClient) GetLogs(q ethereum.FilterQuery) ([]types.Log, error) {
 }
 
 func (e *gethRPCClient) Stop() {
+	e.blockCache.StopJanitor()
 	e.client.Close()
 }
 

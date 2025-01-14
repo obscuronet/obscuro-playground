@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 	"github.com/ten-protocol/go-ten/go/common"
@@ -22,7 +24,7 @@ const (
 )
 
 // AddRollup adds a rollup to the DB
-func AddRollup(dbtx *dbTransaction, statements *SQLStatements, rollup *common.ExtRollup, metadata *common.PublicRollupMetadata, block *common.L1Block) error {
+func AddRollup(dbtx *dbTransaction, statements *SQLStatements, rollup *common.ExtRollup, metadata *common.PublicRollupMetadata, block *types.Header) error {
 	extRollup, err := rlp.EncodeToBytes(rollup)
 	if err != nil {
 		return fmt.Errorf("could not encode rollup: %w", err)

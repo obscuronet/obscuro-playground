@@ -213,8 +213,8 @@ func (g *Guardian) PromoteToActiveSequencer() error {
 // Note: The L1 processing behaviour has two modes based on the state, either
 // - enclave is behind: lookup blocks to feed it 1-by-1 (see `catchupWithL1()`), ignore new live blocks that arrive here
 // - enclave is up-to-date: feed it these live blocks as they arrive, no need to lookup blocks
-func (g *Guardian) HandleBlock(block *types.Block) {
-	g.logger.Debug("Received L1 block", log.BlockHashKey, block.Hash(), log.BlockHeightKey, block.Number())
+func (g *Guardian) HandleBlock(block *types.Header) {
+	g.logger.Debug("Received L1 block", log.BlockHashKey, block.Hash(), log.BlockHeightKey, block.Number)
 	// record the newest block we've seen
 	g.state.OnReceivedBlock(block.Hash())
 	if !g.state.InSyncWithL1() {
@@ -463,8 +463,8 @@ func (g *Guardian) catchupWithL2() error {
 
 // returns false if the block was not processed
 // todo - @matt - think about removing the TryLock
-func (g *Guardian) submitL1Block(block *common.L1Block, isLatest bool) (bool, error) {
-	g.logger.Trace("submitting L1 block", log.BlockHashKey, block.Hash(), log.BlockHeightKey, block.Number())
+func (g *Guardian) submitL1Block(block *types.Header, isLatest bool) (bool, error) {
+	g.logger.Trace("submitting L1 block", log.BlockHashKey, block.Hash(), log.BlockHeightKey, block.Number)
 	if !g.submitDataLock.TryLock() {
 		g.logger.Debug("Unable to submit block, enclave is busy processing data")
 		return false, nil
@@ -485,7 +485,7 @@ func (g *Guardian) submitL1Block(block *common.L1Block, isLatest bool) (bool, er
 			// this is most common when we are returning to a previous fork and the enclave has already seen some of the blocks on it
 			// note: logging this because we don't expect it to happen often and would like visibility on that.
 			g.logger.Info("L1 block already processed by enclave, trying the next block", "block", block.Hash())
-			nextHeight := big.NewInt(0).Add(block.Number(), big.NewInt(1))
+			nextHeight := big.NewInt(0).Add(block.Number, big.NewInt(1))
 			nextCanonicalBlock, err := g.sl.L1Data().FetchBlockByHeight(nextHeight)
 			if err != nil {
 				return false, fmt.Errorf("failed to fetch next block after forking block=%s: %w", block.Hash(), err)
@@ -499,10 +499,6 @@ func (g *Guardian) submitL1Block(block *common.L1Block, isLatest bool) (bool, er
 	g.state.OnProcessedBlock(block.Hash())
 	g.processL1BlockTransactions(block, rollupTxs, syncContracts)
 
-	if err != nil {
-		return false, fmt.Errorf("submitted block to enclave but could not store the block processing result. Cause: %w", err)
-	}
-
 	// todo: make sure this doesn't respond to old requests (once we have a proper protocol for that)
 	err = g.publishSharedSecretResponses(resp.ProducedSecretResponses)
 	if err != nil {
@@ -511,9 +507,9 @@ func (g *Guardian) submitL1Block(block *common.L1Block, isLatest bool) (bool, er
 	return true, nil
 }
 
-func (g *Guardian) processL1BlockTransactions(block *common.L1Block, rollupTxs []*common.L1RollupTx, syncContracts bool) {
+func (g *Guardian) processL1BlockTransactions(block *types.Header, rollupTxs []*common.L1RollupTx, syncContracts bool) {
 	// TODO (@will) this should be removed and pulled from the L1
-	err := g.storage.AddBlock(block.Header())
+	err := g.storage.AddBlock(block)
 	if err != nil {
 		g.logger.Error("Could not add block to host db.", log.ErrKey, err)
 	}

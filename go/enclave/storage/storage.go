@@ -449,7 +449,7 @@ func (s *storageImpl) GetEnclavePubKey(ctx context.Context, enclaveId common.Enc
 	return s.cachingService.ReadEnclavePubKey(ctx, enclaveId, func() (*AttestedEnclave, error) {
 		key, nodeType, err := enclavedb.FetchAttestation(ctx, s.db.GetSQLDB(), enclaveId)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve attestation key for address %s. Cause: %w", enclaveId, err)
+			return nil, fmt.Errorf("could not retrieve attestation key for enclave %s. Cause: %w", enclaveId, err)
 		}
 
 		publicKey, err := gethcrypto.DecompressPubkey(key)

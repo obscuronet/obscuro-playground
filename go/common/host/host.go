@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ten-protocol/go-ten/go/common"
 	hostconfig "github.com/ten-protocol/go-ten/go/host/config"
 	"github.com/ten-protocol/go-ten/go/host/storage"
@@ -36,11 +35,6 @@ type Host interface {
 	// NewHeadsChan returns live batch headers
 	// Note - do not use directly. This is meant only for the NewHeadsManager, which multiplexes the headers
 	NewHeadsChan() chan *common.BatchHeader
-}
-
-type BlockStream struct {
-	Stream <-chan *types.Block // the channel which will receive the consecutive, canonical blocks
-	Stop   func()              // function to permanently stop the stream and clean up any associated processes/resources
 }
 
 type BatchMsg struct {

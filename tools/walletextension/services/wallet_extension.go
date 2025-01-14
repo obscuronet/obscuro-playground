@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/keycard-go/hexutils"
 
 	"github.com/ten-protocol/go-ten/tools/walletextension/cache"
+	"github.com/ten-protocol/go-ten/tools/walletextension/metrics"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -49,6 +50,7 @@ type Services struct {
 	Config              *common.Config
 	NewHeadsService     *subscriptioncommon.NewHeadsService
 	cacheInvalidationCh chan *tencommon.BatchHeader
+	MetricsTracker      metrics.Metrics
 }
 
 type NewHeadNotifier interface {
@@ -58,7 +60,7 @@ type NewHeadNotifier interface {
 // number of rpc responses to cache
 const rpcResponseCacheSize = 1_000_000
 
-func NewServices(hostAddrHTTP string, hostAddrWS string, storage storage.UserStorage, stopControl *stopcontrol.StopControl, version string, logger gethlog.Logger, config *common.Config) *Services {
+func NewServices(hostAddrHTTP string, hostAddrWS string, storage storage.UserStorage, stopControl *stopcontrol.StopControl, version string, logger gethlog.Logger, metricsTracker metrics.Metrics, config *common.Config) *Services {
 	newGatewayCache, err := cache.NewCache(rpcResponseCacheSize, logger)
 	if err != nil {
 		logger.Error(fmt.Errorf("could not create cache. Cause: %w", err).Error())
@@ -80,6 +82,7 @@ func NewServices(hostAddrHTTP string, hostAddrWS string, storage storage.UserSto
 		RateLimiter:         rateLimiter,
 		Config:              config,
 		cacheInvalidationCh: make(chan *tencommon.BatchHeader),
+		MetricsTracker:      metricsTracker,
 	}
 
 	services.NewHeadsService = subscriptioncommon.NewNewHeadsService(
@@ -185,6 +188,7 @@ func (w *Services) GenerateAndStoreNewUser() ([]byte, error) {
 		w.Logger().Error(fmt.Sprintf("failed to save user to the database: %s", err))
 		return nil, err
 	}
+	w.MetricsTracker.RecordNewUser()
 
 	requestEndTime := time.Now()
 	duration := requestEndTime.Sub(requestStartTime)
@@ -194,6 +198,7 @@ func (w *Services) GenerateAndStoreNewUser() ([]byte, error) {
 
 // AddAddressToUser checks if a message is in correct format and if signature is valid. If all checks pass we save address and signature against userID
 func (w *Services) AddAddressToUser(userID []byte, address string, signature []byte, signatureType viewingkey.SignatureType) error {
+	w.MetricsTracker.RecordUserActivity(hexutils.BytesToHex(userID))
 	audit(w, "Adding address to user: %s, address: %s", hexutils.BytesToHex(userID), address)
 	requestStartTime := time.Now()
 	addressFromMessage := gethcommon.HexToAddress(address)
@@ -213,6 +218,7 @@ func (w *Services) AddAddressToUser(userID []byte, address string, signature []b
 		w.Logger().Error(fmt.Errorf("error while storing account (%s) for user (%s): %w", addressFromMessage.Hex(), userID, err).Error())
 		return err
 	}
+	w.MetricsTracker.RecordAccountRegistered()
 
 	audit(w, "Storing new address for user: %s, address: %s, duration: %d ", hexutils.BytesToHex(userID), address, time.Since(requestStartTime).Milliseconds())
 	return nil
@@ -220,6 +226,7 @@ func (w *Services) AddAddressToUser(userID []byte, address string, signature []b
 
 // UserHasAccount checks if provided account exist in the database for given userID
 func (w *Services) UserHasAccount(userID []byte, address string) (bool, error) {
+	w.MetricsTracker.RecordUserActivity(hexutils.BytesToHex(userID))
 	audit(w, "Checking if user has account: %s, address: %s", hexutils.BytesToHex(userID), address)
 	addressBytes, err := hex.DecodeString(address[2:]) // remove 0x prefix from address
 	if err != nil {

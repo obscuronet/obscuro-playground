@@ -7,7 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ethereum/go-ethereum/core/types"
 
 	gethlog "github.com/ethereum/go-ethereum/log"
@@ -133,7 +134,7 @@ func (nhs *NewHeadsService) HealthStatus(context.Context) host.HealthStatus {
 func ConvertBatchHeader(head *common.BatchHeader) *types.Header {
 	return &types.Header{
 		ParentHash:  head.ParentHash,
-		UncleHash:   gethcommon.Hash{},
+		UncleHash:   gethutil.EmptyHash,
 		Coinbase:    head.Coinbase,
 		Root:        head.Root,
 		TxHash:      head.TxHash,

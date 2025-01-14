@@ -50,8 +50,8 @@ func (h *HostContainer) Start() error {
 	if err != nil {
 		return err
 	}
-	h.logger.Info("Started Obscuro host...")
-	fmt.Println("Started Obscuro host...")
+	h.logger.Info("Started TEN host...")
+	fmt.Println("Started TEN host...")
 
 	if h.rpcServer != nil {
 		err = h.rpcServer.Start()
@@ -59,8 +59,8 @@ func (h *HostContainer) Start() error {
 			return err
 		}
 
-		h.logger.Info("Started Obscuro host RPC Server...")
-		fmt.Println("Started Obscuro host RPC Server...")
+		h.logger.Info("Started TEN host RPC Server...")
+		fmt.Println("Started TEN host RPC Server...")
 	}
 
 	return nil

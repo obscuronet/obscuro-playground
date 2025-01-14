@@ -80,18 +80,18 @@ type L1DataService interface {
 	// Subscribe will register a block handler to receive new blocks as they arrive, returns unsubscribe func
 	Subscribe(handler L1BlockHandler) func()
 
-	FetchBlockByHeight(height *big.Int) (*types.Block, error)
+	FetchBlockByHeight(height *big.Int) (*types.Header, error)
 	// FetchNextBlock returns the next canonical block after a given block hash
 	// It returns the new block, a bool which is true if the block is the current L1 head and a bool if the block is on a different fork to prevBlock
-	FetchNextBlock(prevBlock gethcommon.Hash) (*types.Block, bool, error)
+	FetchNextBlock(prevBlock gethcommon.Hash) (*types.Header, bool, error)
 	// GetTenRelevantTransactions returns the events and transactions relevant to Ten
-	GetTenRelevantTransactions(block *common.L1Block) (*common.ProcessedL1Data, error)
+	GetTenRelevantTransactions(block *types.Header) (*common.ProcessedL1Data, error)
 }
 
 // L1BlockHandler is an interface for receiving new blocks from the repository as they arrive
 type L1BlockHandler interface {
 	// HandleBlock will be called in a new goroutine for each new block as it arrives
-	HandleBlock(block *types.Block)
+	HandleBlock(block *types.Header)
 }
 
 // L1Publisher provides an interface for the host to interact with Ten data (management contract etc.) on L1

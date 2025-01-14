@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ten-protocol/go-ten/go/enclave/crosschain"
 	"github.com/ten-protocol/go-ten/go/ethadapter/mgmtcontractlib"
 
@@ -26,8 +28,8 @@ import (
 )
 
 var (
-	// todo (@matt) make this configurable?
-	_timeoutNoBlocks = 30 * time.Second
+	l1BlockTime      = 12 * time.Second
+	_timeoutNoBlocks = 2 * l1BlockTime // after this timeout we assume the subscription to the L1 node is not working
 	one              = big.NewInt(1)
 	ErrNoNextBlock   = errors.New("no next block")
 )
@@ -100,58 +102,66 @@ func (r *DataService) Subscribe(handler host.L1BlockHandler) func() {
 
 // FetchNextBlock calculates the next canonical block that should be sent to requester after a given hash.
 // It returns the block and a bool for whether it is the latest known head
-func (r *DataService) FetchNextBlock(prevBlockHash gethcommon.Hash) (*types.Block, bool, error) {
-	if prevBlockHash == r.head {
-		// prevBlock is the latest known head
+func (r *DataService) FetchNextBlock(remoteHead gethcommon.Hash) (*types.Header, bool, error) {
+	if remoteHead == r.head {
+		// remoteHead is the latest known head
 		return nil, false, ErrNoNextBlock
 	}
 
-	if prevBlockHash == (gethcommon.Hash{}) {
-		// prevBlock is empty, so we are starting from genesis
-		blk, err := r.ethClient.BlockByNumber(big.NewInt(0))
+	if remoteHead == gethutil.EmptyHash {
+		// remoteHead is empty, so we are starting from genesis
+		blk, err := r.ethClient.HeaderByNumber(big.NewInt(0))
 		if err != nil {
 			return nil, false, fmt.Errorf("could not find genesis block - %w", err)
 		}
 		return blk, false, nil
 	}
 
-	// the latestCanonAncestor will usually return the prevBlock itself but this step is necessary to walk back if there was a fork
-	lca, err := r.latestCanonAncestor(prevBlockHash)
+	// the latestCanonAncestor will usually return the remoteHead itself but this step is necessary to walk back if there was a fork
+	fork, err := r.latestCanonAncestor(remoteHead)
 	if err != nil {
 		return nil, false, err
 	}
+
 	// and send the canonical block at the height after that
 	// (which may be a fork, or it may just be the next on the same branch if we are catching-up)
-	blk, err := r.ethClient.BlockByNumber(increment(lca.Number()))
+	blk, err := r.ethClient.HeaderByNumber(increment(fork.CommonAncestor.Number))
 	if err != nil {
 		if errors.Is(err, ethereum.NotFound) {
 			return nil, false, ErrNoNextBlock
 		}
-		return nil, false, fmt.Errorf("could not find block after latest canon ancestor, height=%s - %w", increment(lca.Number()), err)
+		return nil, false, fmt.Errorf("could not find block after latest canon ancestor, height=%s - %w", increment(fork.CommonAncestor.Number), err)
 	}
 
 	return blk, blk.Hash() == r.head, nil
 }
 
-func (r *DataService) latestCanonAncestor(blkHash gethcommon.Hash) (*types.Block, error) {
-	blk, err := r.ethClient.BlockByHash(blkHash)
+func (r *DataService) FetchBlock(_ context.Context, blockHash common.L1BlockHash) (*types.Header, error) {
+	return r.ethClient.HeaderByHash(blockHash)
+}
+
+func (r *DataService) latestCanonAncestor(blkHash gethcommon.Hash) (*common.ChainFork, error) {
+	ctx := context.Background()
+	currentHead, err := r.ethClient.HeaderByNumber(nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch L1 head- %w", err)
+	}
+	blk, err := r.ethClient.HeaderByHash(blkHash)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch L1 block with hash=%s - %w", blkHash, err)
 	}
-	canonAtSameHeight, err := r.ethClient.BlockByNumber(blk.Number())
+
+	fork, err := gethutil.LCA(ctx, currentHead, blk, r)
 	if err != nil {
-		return nil, fmt.Errorf("unable to fetch L1 block at height=%d - %w", blk.Number(), err)
+		return nil, fmt.Errorf("unable to calculate LCA - %w", err)
 	}
-	if blk.Hash() != canonAtSameHeight.Hash() {
-		return r.latestCanonAncestor(blk.ParentHash())
-	}
-	return blk, nil
+	return fork, nil
 }
 
 // GetTenRelevantTransactions processes logs in their natural order without grouping by transaction hash.
-func (r *DataService) GetTenRelevantTransactions(block *common.L1Block) (*common.ProcessedL1Data, error) {
+func (r *DataService) GetTenRelevantTransactions(block *types.Header) (*common.ProcessedL1Data, error) {
 	processed := &common.ProcessedL1Data{
-		BlockHeader: block.Header(),
+		BlockHeader: block,
 		Events:      []common.L1Event{},
 	}
 
@@ -192,7 +202,8 @@ func (r *DataService) GetTenRelevantTransactions(block *common.L1Block) (*common
 		case crosschain.NetworkSecretRespondedID:
 			processed.AddEvent(common.SecretResponseTx, txData)
 		default:
-			r.logger.Warn("Unknown log topic", "topic", l.Topics[0], "txHash", l.TxHash)
+			// there are known events that we don't care about here
+			r.logger.Debug("Unknown log topic", "topic", l.Topics[0], "txHash", l.TxHash)
 		}
 	}
 
@@ -200,7 +211,7 @@ func (r *DataService) GetTenRelevantTransactions(block *common.L1Block) (*common
 }
 
 // fetchMessageBusMgmtContractLogs retrieves all logs from management contract and message bus addresses
-func (r *DataService) fetchMessageBusMgmtContractLogs(block *common.L1Block) ([]types.Log, error) {
+func (r *DataService) fetchMessageBusMgmtContractLogs(block *types.Header) ([]types.Log, error) {
 	blkHash := block.Hash()
 	var allAddresses []gethcommon.Address
 	allAddresses = append(allAddresses, r.contractAddresses[MgmtContract]...)
@@ -284,30 +295,34 @@ func (r *DataService) streamLiveBlocks() {
 	liveStream, streamSub := r.resetLiveStream()
 	for r.running.Load() {
 		select {
-		case header := <-liveStream:
-			r.head = header.Hash()
-			block, err := r.ethClient.BlockByHash(header.Hash())
-			if err != nil {
-				r.logger.Error("Error fetching new block", log.BlockHashKey, header.Hash(),
-					log.BlockHeightKey, header.Number, log.ErrKey, err)
-				continue
-			}
+		case blockHeader := <-liveStream:
+			r.head = blockHeader.Hash()
 			for _, handler := range r.blockSubscribers.Subscribers() {
-				go handler.HandleBlock(block)
+				go handler.HandleBlock(blockHeader)
 			}
 		case <-time.After(_timeoutNoBlocks):
-			r.logger.Warn("no new blocks received since timeout", "timeout", _timeoutNoBlocks)
+			r.logger.Warn("no new blocks received since timeout. Reconnecting..", "timeout", _timeoutNoBlocks)
+			if streamSub != nil {
+				streamSub.Unsubscribe()
+			}
+			if liveStream != nil {
+				close(liveStream)
+			}
 			// reset stream to ensure it has not died
 			liveStream, streamSub = r.resetLiveStream()
 		}
 	}
-
+	r.logger.Info("block streaming stopped")
 	if streamSub != nil {
 		streamSub.Unsubscribe()
+	}
+	if liveStream != nil {
+		close(liveStream)
 	}
 }
 
 func (r *DataService) resetLiveStream() (chan *types.Header, ethereum.Subscription) {
+	r.logger.Info("reconnecting to L1 new Heads")
 	err := retry.Do(func() error {
 		if !r.running.Load() {
 			// break out of the loop if repository has stopped
@@ -325,11 +340,14 @@ func (r *DataService) resetLiveStream() (chan *types.Header, ethereum.Subscripti
 		r.logger.Warn("unable to reconnect to L1", log.ErrKey, err)
 		return nil, nil
 	}
-	return r.ethClient.BlockListener()
+
+	ch, s := r.ethClient.BlockListener()
+	r.logger.Info("successfully reconnected to L1 new Heads")
+	return ch, s
 }
 
-func (r *DataService) FetchBlockByHeight(height *big.Int) (*types.Block, error) {
-	return r.ethClient.BlockByNumber(height)
+func (r *DataService) FetchBlockByHeight(height *big.Int) (*types.Header, error) {
+	return r.ethClient.HeaderByNumber(height)
 }
 
 // getEnclaveIdFromLog gets the enclave ID from the log topic

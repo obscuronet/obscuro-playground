@@ -64,7 +64,7 @@ func UnauthenticatedTenRPCCall[R any](ctx context.Context, w *services.Services,
 
 	res, err := cache.WithCache(w.RPCResponsesCache, cfg, generateCacheKey(cacheArgs), func() (*R, error) {
 		return services.WithPlainRPCConnection(ctx, w.BackendRPC, func(client *rpc.Client) (*R, error) {
-			var resp *R
+			var resp *R = new(R)
 			var err error
 
 			// wrap the context with a timeout to prevent long executions
@@ -75,7 +75,13 @@ func UnauthenticatedTenRPCCall[R any](ctx context.Context, w *services.Services,
 			return resp, err
 		})
 	})
-	audit(w, "RPC call. method=%s args=%v result=%s error=%s time=%d", method, args, res, err, time.Since(requestStartTime).Milliseconds())
+
+	if err != nil {
+		audit(w, "RPC call failed. method=%s args=%v error=%+v time=%d", method, args, err, time.Since(requestStartTime).Milliseconds())
+		return nil, err
+	}
+
+	audit(w, "RPC call succeeded. method=%s args=%v result=%+v time=%d", method, args, res, time.Since(requestStartTime).Milliseconds())
 	return res, err
 }
 
@@ -86,6 +92,8 @@ func ExecAuthRPC[R any](ctx context.Context, w *services.Services, cfg *AuthExec
 	if err != nil {
 		return nil, err
 	}
+
+	w.MetricsTracker.RecordUserActivity(hexutils.BytesToHex(user.ID))
 
 	rateLimitAllowed, requestUUID := w.RateLimiter.Allow(gethcommon.Address(user.ID))
 	defer w.RateLimiter.SetRequestEnd(gethcommon.Address(user.ID), requestUUID)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ten-protocol/go-ten/go/common/gethutil"
+
 	"github.com/ten-protocol/go-ten/go/enclave/storage"
 
 	"github.com/ten-protocol/go-ten/go/common/log"
@@ -121,7 +123,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash gethcommon.Hash, blockNu
 		R:        (*hexutil.Big)(r),
 		S:        (*hexutil.Big)(s),
 	}
-	if blockHash != (gethcommon.Hash{}) {
+	if blockHash != gethutil.EmptyHash {
 		result.BlockHash = &blockHash
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 		result.TransactionIndex = (*hexutil.Uint64)(&index)
@@ -138,7 +140,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash gethcommon.Hash, blockNu
 		result.GasFeeCap = (*hexutil.Big)(tx.GasFeeCap())
 		result.GasTipCap = (*hexutil.Big)(tx.GasTipCap())
 		// if the transaction has been mined, compute the effective gas price
-		if baseFee != nil && blockHash != (gethcommon.Hash{}) {
+		if baseFee != nil && blockHash != gethutil.EmptyHash {
 			// price = min(tip, gasFeeCap - baseFee) + baseFee
 			price := math.BigMin(new(big.Int).Add(tx.GasTipCap(), baseFee), tx.GasFeeCap())
 			result.GasPrice = (*hexutil.Big)(price)

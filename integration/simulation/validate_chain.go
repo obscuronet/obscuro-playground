@@ -176,13 +176,13 @@ func checkBlockchainOfEthereumNode(t *testing.T, node ethadapter.EthClient, minH
 	if err != nil {
 		t.Errorf("Node %d: Could not find head block. Cause: %s", nodeIdx, err)
 	}
-	height := head.NumberU64()
+	height := head.Number.Uint64()
 
 	if height < minHeight {
 		t.Errorf("Node %d: There were only %d blocks mined. Expected at least: %d.", nodeIdx, height, minHeight)
 	}
 
-	deposits, rollups, _, blockCount, _, rollupReceipts := ExtractDataFromEthereumChain(ethereummock.MockGenesisBlock, head, node, s, nodeIdx)
+	deposits, rollups, _, blockCount, _, rollupReceipts := ExtractDataFromEthereumChain(ethereummock.MockGenesisBlock.Header(), head, node, s, nodeIdx)
 	s.Stats.TotalL1Blocks = uint64(blockCount)
 
 	checkCollectedL1Fees(t, node, s, nodeIdx, rollupReceipts)
@@ -247,21 +247,19 @@ func checkRollups(t *testing.T, _ *Simulation, nodeIdx int, rollups []*common.Ex
 
 // ExtractDataFromEthereumChain returns the deposits, rollups, total amount deposited and length of the blockchain
 // between the start block and the end block.
-func ExtractDataFromEthereumChain(
-	startBlock *types.Block,
-	endBlock *types.Block,
-	node ethadapter.EthClient,
-	s *Simulation,
-	nodeIdx int,
-) ([]gethcommon.Hash, []*common.ExtRollup, *big.Int, int, uint64, types.Receipts) {
+func ExtractDataFromEthereumChain(startBlock *types.Header, endBlock *types.Header, node ethadapter.EthClient, s *Simulation, nodeIdx int) ([]gethcommon.Hash, []*common.ExtRollup, *big.Int, int, uint64, types.Receipts) {
 	deposits := make([]gethcommon.Hash, 0)
 	rollups := make([]*common.ExtRollup, 0)
 	rollupReceipts := make(types.Receipts, 0)
 	totalDeposited := big.NewInt(0)
 
-	blockchain := node.BlocksBetween(startBlock.Header(), endBlock)
+	blockchain := node.BlocksBetween(startBlock, endBlock)
 	successfulDeposits := uint64(0)
-	for _, block := range blockchain {
+	for _, header := range blockchain {
+		block, err := node.BlockByHash(header.Hash())
+		if err != nil {
+			panic(err)
+		}
 		for _, tx := range block.Transactions() {
 			t := s.Params.ERC20ContractLib.DecodeTx(tx)
 			if t == nil {

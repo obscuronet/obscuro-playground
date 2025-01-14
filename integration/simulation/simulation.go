@@ -52,7 +52,7 @@ type Simulation struct {
 
 // Start executes the simulation given all the Params. Injects transactions.
 func (s *Simulation) Start() {
-	testlog.Logger().Info(fmt.Sprintf("Genesis block: b_%d.", common.ShortHash(ethereummock.MockGenesisBlock.Hash())))
+	testlog.Logger().Info(fmt.Sprintf("Genesis block: b_%s.", ethereummock.MockGenesisBlock.Hash()))
 	s.ctx = context.Background() // use injected context for graceful shutdowns
 
 	fmt.Printf("Waiting for TEN genesis on L1\n")
@@ -132,7 +132,11 @@ func (s *Simulation) waitForTenGenesisOnL1() {
 			panic(fmt.Errorf("could not fetch head block. Cause: %w", err))
 		}
 		if err == nil {
-			for _, b := range client.BlocksBetween(ethereummock.MockGenesisBlock.Header(), head) {
+			for _, h := range client.BlocksBetween(ethereummock.MockGenesisBlock.Header(), head) {
+				b, err := client.BlockByHash(h.Hash())
+				if err != nil {
+					panic(err)
+				}
 				for _, tx := range b.Transactions() {
 					t := s.Params.MgmtContractLib.DecodeTx(tx)
 					if t == nil {

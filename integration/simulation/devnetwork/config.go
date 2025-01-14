@@ -74,7 +74,7 @@ func LocalDevNetwork(tenConfigOpts ...TenConfigOption) *InMemDevNetwork {
 	l1Config := &L1Config{
 		PortStart:        integration.TestPorts.NetworkTestsPort,
 		NumNodes:         tenConfig.NumNodes, // we'll have 1 L1 node per L2 node
-		AvgBlockDuration: 1 * time.Second,
+		AvgBlockDuration: 2 * time.Second,
 	}
 	l1Network := NewGethNetwork(nodeOpL1Wallets, l1Config)
 
