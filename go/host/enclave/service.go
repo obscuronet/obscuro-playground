@@ -134,7 +134,7 @@ func (e *Service) NotifyUnavailable(enclaveID *common.EnclaveID) {
 		e.logger.Info("not running in HA mode, no need to evict enclave", log.EnclaveIDKey, enclaveID)
 		return
 	}
-	if *e.activeSequencerID != *enclaveID {
+	if e.activeSequencerID == nil || *e.activeSequencerID != *enclaveID {
 		e.logger.Info("Enclave is not the active sequencer, no need to evict yet.", log.EnclaveIDKey, enclaveID)
 		return
 	}
