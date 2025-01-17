@@ -772,7 +772,7 @@ func (s *storageImpl) StoreRollup(ctx context.Context, rollup *common.ExtRollup,
 	}
 	defer dbTx.Rollback()
 
-	blockId, err := enclavedb.GetBlockId(ctx, dbTx, rollup.Header.CompressionL1Head)
+	blockId, err := enclavedb.GetBlockId(ctx, dbTx, rollup.Header.BlockHash)
 	if err != nil {
 		return fmt.Errorf("could not get block id - %w", err)
 	}

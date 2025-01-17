@@ -79,6 +79,7 @@ func (m *mockContractLib) DecodeTx(tx *types.Transaction) common.L1TenTransactio
 	return decodeTx(tx)
 }
 
+// TODO: Ziga - fix this mock implementation later if needed
 func (m *mockContractLib) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, error) {
 	var err error
 	blobs, err := ethadapter.EncodeBlobs(t.Rollup)

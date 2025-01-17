@@ -9,14 +9,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ten-protocol/go-ten/go/common/errutil"
 	"github.com/ten-protocol/go-ten/go/common/gethencoding"
 	"github.com/ten-protocol/go-ten/go/common/measure"
 	"github.com/ten-protocol/go-ten/go/enclave/storage"
 
 	"github.com/ten-protocol/go-ten/go/common/compression"
+	"github.com/ten-protocol/go-ten/go/ethadapter"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ten-protocol/go-ten/go/common"
@@ -302,20 +305,67 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 		return nil, err
 	}
 	upToL1Height := currentL1Head.Number.Uint64() - RollupDelay
+
 	rollup, err := s.rollupProducer.CreateInternalRollup(ctx, lastBatchNo, upToL1Height, rollupLimiter)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create and compress rollup data
 	extRollup, err := s.rollupCompression.CreateExtRollup(ctx, rollup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress rollup: %w", err)
 	}
 
-	// todo - double-check that this signing approach is secure, and it properly includes the entire payload
-	if err := s.signRollup(extRollup); err != nil {
-		return nil, fmt.Errorf("failed to sign created rollup: %w", err)
+	// Create the blob data inside enclave
+	rollupData, err := common.EncodeRollup(extRollup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode rollup: %w", err)
 	}
+
+	// Create the blobs inside enclave
+	blobs, err := ethadapter.EncodeBlobs(rollupData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
+	}
+
+	// Calculate blob hash from first blob
+	commitment, err := kzg4844.BlobToCommitment(blobs[0])
+	if err != nil {
+		return nil, fmt.Errorf("cannot compute KZG commitment: %w", err)
+	}
+	blobHash := ethadapter.KZGToVersionedHash(commitment)
+
+	s.logger.Info("Block binding info",
+		"currentL1Head.Number", currentL1Head.Number,
+		"currentL1Head.Hash", currentL1Head.Hash(),
+		"upToL1Height", upToL1Height)
+
+	// Store blob data and required fields
+	extRollup.Header.BlobHash = blobHash
+	extRollup.Header.MessageRoot = gethcommon.Hash{} // Zero for now, will be implemented later
+	extRollup.Header.BlockNumber = currentL1Head.Number.Uint64()
+	extRollup.Header.BlockHash = currentL1Head.Hash()
+
+	// Create composite hash matching the contract's expectations
+	compositeHash := gethcrypto.Keccak256Hash(
+		blobHash.Bytes(),
+		extRollup.Header.MessageRoot.Bytes(),
+		currentL1Head.Hash().Bytes(),
+		big.NewInt(int64(currentL1Head.Number.Uint64())).Bytes(),
+		big.NewInt(int64(extRollup.Header.LastBatchSeqNo)).Bytes(),
+	)
+
+	// Sign the composite hash
+	signature, err := s.enclaveKeyService.Sign(compositeHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign rollup: %w", err)
+	}
+	extRollup.Header.Signature = signature
+
+	s.logger.Info("Rollup block binding",
+		"BlockNumber", extRollup.Header.BlockNumber,
+		"BlockHash", extRollup.Header.BlockHash)
 
 	return extRollup, nil
 }
@@ -422,15 +472,6 @@ func (s *sequencer) OnL1Fork(ctx context.Context, fork *common.ChainFork) error 
 func (s *sequencer) signBatch(batch *core.Batch) error {
 	var err error
 	batch.Header.Signature, err = s.enclaveKeyService.Sign(batch.Hash())
-	if err != nil {
-		return fmt.Errorf("could not sign batch. Cause: %w", err)
-	}
-	return nil
-}
-
-func (s *sequencer) signRollup(rollup *common.ExtRollup) error {
-	var err error
-	rollup.Header.Signature, err = s.enclaveKeyService.Sign(rollup.Header.Hash())
 	if err != nil {
 		return fmt.Errorf("could not sign batch. Cause: %w", err)
 	}
