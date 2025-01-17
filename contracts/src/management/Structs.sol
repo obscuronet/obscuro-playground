@@ -11,6 +11,7 @@ interface Structs {
         bytes32 BlockHash;
         bytes32 MessageRoot;
         uint256 BlockNumber;
+        bytes32 BlobHash;
     }
 
     struct RollupStorage {

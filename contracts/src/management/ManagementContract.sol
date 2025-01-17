@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.8.24 <0.9.0;
+pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -80,7 +80,7 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
     function GetRollupByNumber(uint256 number) view public returns(bool, Structs.MetaRollup memory) {
         bytes32 hash = rollups.byOrder[number];
         if (hash == 0x0) { // ensure we don't try to get rollup for hash zero as that would not pull anything, but the hash would match and return true
-            return (false, Structs.MetaRollup(0x0, "", 0));
+            return (false, Structs.MetaRollup(0x0, "", 0, 0x0, 0x0, 0, 0x0));
         }
 
         return GetRollupByHash(hash);
@@ -120,7 +120,7 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
         require(block.number < (blockNum + 255), "Block binding too old");
         require(block.number != blockNum, "Cannot bind to the block that is being currently mined");
 
-        bytes32 knownBlockHash = blockhash(blockNum);
+        bytes32 knownBlockHash = blockhash(blockNum); 
         require(knownBlockHash != 0x0, "Unknown block hash");
         require(knownBlockHash == providedBlockHash, "Block binding mismatch");
         require(rollups.toUniqueForkID[rollupNumber] == forkID, "Invalid forkID");
@@ -134,7 +134,7 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
 
         for(uint256 i = 0; i < crossChainHashes.length; i++) {
             merkleMessageBus.addStateRoot(
-                bytes32(crossChainHashes[i]), block.timestamp + challengePeriod
+                bytes32(crossChainHashes[i]), block.timestamp //block.timestamp + challengePeriod
             );
             bundleHash = keccak256(abi.encode(bundleHash, bytes32(crossChainHashes[i])));
         }
@@ -151,28 +151,12 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
 
     // solc-ignore-next-line unused-param
     function AddRollup(Structs.MetaRollup calldata r) public {
-        // Verify block binding
-        require(block.number > r.BlockNumber, "Cannot bind to future block");
-        require(block.number < (r.BlockNumber + 255), "Block binding too old");
-        bytes32 knownBlockHash = blockhash(r.BlockNumber);
-        require(knownBlockHash != 0x0, "Unknown block hash");
-        require(knownBlockHash == r.BlockHash, "Block binding mismatch");
-        // Verify blob hash using the opcode
-        bytes32 computedBlobHash = blobhash(0); // TODO: Is rollup data always stored in the first blob? 
-        require(computedBlobHash == r.BlobHash, "Invalid blob hash");
-        // Create composite hash that the enclave would have signed
-        bytes32 compositeHash = keccak256(abi.encode(
-            r.BlobHash,          // Hash from blob
-            r.MessageRoot,       // Cross-chain message root
-            knownBlockHash,      // Block binding (using knownBlockHash instead of undefined blockHash)
-            r.BlockNumber,       // Block number
-            r.LastSequenceNumber // Include sequence for ordering
-        ));
-        
-        address enclaveID = ECDSA.recover(compositeHash, r.Signature);
+        address enclaveID = ECDSA.recover(r.Hash, r.Signature);
+        // revert if the EnclaveID is not attested
         require(attested[enclaveID], "enclaveID not attested");
+        // revert if the EnclaveID is not permissioned as a sequencer
         require(sequencerEnclave[enclaveID], "enclaveID not a sequencer");
-        
+
         AppendRollup(r);
         emit RollupAdded(r.Hash);
     }
@@ -284,12 +268,12 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
     }
 
     // Return the challenge period delay for message bus root
-    function GetChallengePeriod() public view returns (uint256) {
+    function getChallengePeriod() public view returns (uint256) {
         return challengePeriod;
     }
-
+    
     // Sets the challenge period for message bus root (owner only)
-    function SetChallengePeriod(uint256 _delay) public onlyOwner {
+    function setChallengePeriod(uint256 _delay) public onlyOwner {
         challengePeriod = _delay;
     }
 }

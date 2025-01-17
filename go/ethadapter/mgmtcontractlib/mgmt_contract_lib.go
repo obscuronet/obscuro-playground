@@ -129,7 +129,7 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 	}
 
 	// Calculate blob hash from first blob
-	blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
+	//blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute blob hash: %w", err)
 	}
@@ -139,10 +139,10 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 		Hash:               decodedRollup.Header.PayloadHash,
 		Signature:          decodedRollup.Header.Signature,
 		LastSequenceNumber: big.NewInt(int64(decodedRollup.Header.LastBatchSeqNo)),
-		BlockHash:          decodedRollup.Header.CompressionL1Head, // Using CompressionL1Head as BlockHash
-		MessageRoot:        common.Hash{},                          // Zero for now as specified
-		BlockNumber:        big.NewInt(int64(decodedRollup.Header.BlockNumber)),
-		BlobHash:           blobHash,
+		//BlockHash:          decodedRollup.Header.CompressionL1Head, // Using CompressionL1Head as BlockHash
+		//MessageRoot:        common.Hash{},                          // Zero for now as specified
+		//BlockNumber:        big.NewInt(int64(decodedRollup.Header.BlockNumber)),
+		//BlobHash:           blobHash,
 	}
 
 	data, err := c.contractABI.Pack(
