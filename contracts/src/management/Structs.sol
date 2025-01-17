@@ -8,6 +8,9 @@ interface Structs {
         bytes32 Hash;
         bytes Signature;
         uint256 LastSequenceNumber;
+        bytes32 BlockHash;
+        bytes32 MessageRoot;
+        uint256 BlockNumber;
     }
 
     struct RollupStorage {

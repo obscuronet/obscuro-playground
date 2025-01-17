@@ -151,12 +151,28 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
 
     // solc-ignore-next-line unused-param
     function AddRollup(Structs.MetaRollup calldata r) public {
-        address enclaveID = ECDSA.recover(r.Hash, r.Signature);
-        // revert if the EnclaveID is not attested
+        // Verify block binding
+        require(block.number > r.BlockNumber, "Cannot bind to future block");
+        require(block.number < (r.BlockNumber + 255), "Block binding too old");
+        bytes32 knownBlockHash = blockhash(r.BlockNumber);
+        require(knownBlockHash != 0x0, "Unknown block hash");
+        require(knownBlockHash == r.BlockHash, "Block binding mismatch");
+        // Verify blob hash using the opcode
+        bytes32 computedBlobHash = blobhash(0); // TODO: Is rollup data always stored in the first blob? 
+        require(computedBlobHash == r.BlobHash, "Invalid blob hash");
+        // Create composite hash that the enclave would have signed
+        bytes32 compositeHash = keccak256(abi.encode(
+            r.BlobHash,          // Hash from blob
+            r.MessageRoot,       // Cross-chain message root
+            knownBlockHash,      // Block binding (using knownBlockHash instead of undefined blockHash)
+            r.BlockNumber,       // Block number
+            r.LastSequenceNumber // Include sequence for ordering
+        ));
+        
+        address enclaveID = ECDSA.recover(compositeHash, r.Signature);
         require(attested[enclaveID], "enclaveID not attested");
-        // revert if the EnclaveID is not permissioned as a sequencer
         require(sequencerEnclave[enclaveID], "enclaveID not a sequencer");
-
+        
         AppendRollup(r);
         emit RollupAdded(r.Hash);
     }
