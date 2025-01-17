@@ -311,37 +311,39 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 		return nil, err
 	}
 
+	// Create and compress rollup data
 	extRollup, err := s.rollupCompression.CreateExtRollup(ctx, rollup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress rollup: %w", err)
 	}
 
-	// Create the blob data
+	// Create the blob data inside enclave
 	rollupData, err := common.EncodeRollup(extRollup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode rollup: %w", err)
 	}
 
-	// Create the blobs
+	// Create the blobs inside enclave
 	blobs, err := ethadapter.EncodeBlobs(rollupData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
 	}
 
-	// Calculate blob hash
-	blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
+	// Calculate blob hash from first blob
+	commitment, err := kzg4844.BlobToCommitment(blobs[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to compute blob hash: %w", err)
+		return nil, fmt.Errorf("cannot compute KZG commitment: %w", err)
 	}
+	blobHash := ethadapter.KZGToVersionedHash(commitment)
 
 	// Store blob data and required fields
 	extRollup.BlobData = blobs
 	extRollup.Header.BlobHash = blobHash
-	extRollup.Header.MessageRoot = gethcommon.Hash{} // TODO: Implement message root
+	extRollup.Header.MessageRoot = gethcommon.Hash{} // Zero for now, will be implemented later
 	extRollup.Header.BlockNumber = currentL1Head.Number.Uint64()
 	extRollup.Header.CompressionL1Head = currentL1Head.Hash()
 
-	// Create composite hash matching the contract expectation
+	// Create composite hash matching the contract's expectations
 	compositeHash := gethcrypto.Keccak256Hash(
 		blobHash.Bytes(),
 		extRollup.Header.MessageRoot.Bytes(),
