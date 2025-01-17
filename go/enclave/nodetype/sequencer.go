@@ -478,33 +478,3 @@ func (s *sequencer) OnL1Block(ctx context.Context, block *types.Header, result *
 func (s *sequencer) Close() error {
 	return s.mempool.Close()
 }
-
-func createRollupSignatureHash(header *common.RollupHeader, blobHash gethcommon.Hash) gethcommon.Hash {
-	return gethcrypto.Keccak256Hash(
-		blobHash.Bytes(),                                 // Hash from blob
-		gethcommon.Hash{}.Bytes(),                        // MessageRoot (zero for now)
-		header.CompressionL1Head.Bytes(),                 // Block binding
-		big.NewInt(int64(header.LastBatchSeqNo)).Bytes(), // Last sequence number
-	)
-}
-
-func (s *sequencer) signRollup(rollup *common.ExtRollup) error {
-	// Get the blob hash from first blob
-	var blobHash gethcommon.Hash
-	if len(rollup.BlobData) > 0 {
-		commitment, err := kzg4844.BlobToCommitment(rollup.BlobData[0])
-		if err != nil {
-			return fmt.Errorf("cannot compute KZG commitment: %w", err)
-		}
-		blobHash = ethadapter.KZGToVersionedHash(commitment)
-	}
-
-	// Create and sign the composite hash
-	signatureHash := createRollupSignatureHash(rollup.Header, blobHash)
-	var err error
-	rollup.Header.Signature, err = s.enclaveKeyService.Sign(signatureHash)
-	if err != nil {
-		return fmt.Errorf("could not sign rollup: %w", err)
-	}
-	return nil
-}
