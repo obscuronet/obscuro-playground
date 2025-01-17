@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ten-protocol/go-ten/integration/ethereummock"
+
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ten-protocol/go-ten/go/ethadapter/mgmtcontractlib"
 
@@ -68,11 +70,10 @@ func NewEnclaveAdminAPI(config *enclaveconfig.EnclaveConfig, storage storage.Sto
 		}
 	}
 	sharedSecretProcessor := components.NewSharedSecretProcessor(mgmtContractLib, attestationProvider, enclaveKeyService.EnclaveID(), storage, sharedSecretService, logger)
-	sigVerifier, err := components.NewSignatureValidator(storage)
+	sigVerifier, err := getSignatureValidator(config.UseInMemoryDB, storage)
 	if err != nil {
 		logger.Crit("Could not initialise the signature validator", log.ErrKey, err)
 	}
-
 	dataCompressionService := compression.NewBrotliDataCompressionService()
 
 	rollupCompression := components.NewRollupCompression(registry, batchExecutor, daEncryptionService, dataCompressionService, storage, gethEncodingService, chainConfig, config, logger)
@@ -599,4 +600,11 @@ func exportCrossChainData(ctx context.Context, storage storage.Storage, fromSeqN
 		CrossChainRootHashes: crossChainHashes,
 	} // todo: check fromSeqNo
 	return bundle, nil
+}
+
+func getSignatureValidator(useInMemDB bool, storage storage.Storage) (components.SequencerSignatureVerifier, error) {
+	if useInMemDB {
+		return ethereummock.NewMockSignatureValidator(), nil
+	}
+	return components.NewSignatureValidator(storage)
 }

@@ -27,7 +27,7 @@ type rollupConsumerImpl struct {
 	logger gethlog.Logger
 
 	storage      storage.Storage
-	sigValidator *SignatureValidator
+	sigValidator SequencerSignatureVerifier
 }
 
 func NewRollupConsumer(
@@ -36,7 +36,7 @@ func NewRollupConsumer(
 	rollupCompression *RollupCompression,
 	storage storage.Storage,
 	logger gethlog.Logger,
-	verifier *SignatureValidator,
+	verifier SequencerSignatureVerifier,
 ) RollupConsumer {
 	return &rollupConsumerImpl{
 		MgmtContractLib:   mgmtContractLib,

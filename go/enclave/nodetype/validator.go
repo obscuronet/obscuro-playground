@@ -27,7 +27,7 @@ type validator struct {
 	chainConfig *params.ChainConfig
 
 	storage      storage.Storage
-	sigValidator *components.SignatureValidator
+	sigValidator components.SequencerSignatureVerifier
 	mempool      *components.TxPool
 
 	logger gethlog.Logger
@@ -39,7 +39,7 @@ func NewValidator(
 	registry components.BatchRegistry,
 	chainConfig *params.ChainConfig,
 	storage storage.Storage,
-	sigValidator *components.SignatureValidator,
+	sigValidator components.SequencerSignatureVerifier,
 	mempool *components.TxPool,
 	logger gethlog.Logger,
 ) Validator {

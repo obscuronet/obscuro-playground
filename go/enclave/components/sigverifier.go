@@ -12,13 +12,17 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// SequencerSignatureVerifier interface for signature validation
+type SequencerSignatureVerifier interface {
+	CheckSequencerSignature(hash gethcommon.Hash, sig []byte) error
+}
+
 type SignatureValidator struct {
 	attestedKey *ecdsa.PublicKey
 	storage     storage.Storage
 }
 
 func NewSignatureValidator(storage storage.Storage) (*SignatureValidator, error) {
-	// todo (#718) - sequencer identities should be retrieved from the L1 management contract
 	return &SignatureValidator{
 		storage:     storage,
 		attestedKey: nil,
@@ -34,11 +38,6 @@ func (sigChecker *SignatureValidator) CheckSequencerSignature(hash gethcommon.Ha
 	sequencerIDs, err := sigChecker.storage.GetSequencerEnclaveIDs(context.Background())
 	if err != nil {
 		return fmt.Errorf("could not fetch sequencer IDs: %w", err)
-	}
-
-	// todo no-op for in-mem test, we can add a mock version of this
-	if len(sequencerIDs) == 0 {
-		return nil
 	}
 
 	// loop through sequencer keys and exit early if one of them matches
