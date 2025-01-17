@@ -328,13 +328,34 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
 	}
 
-	// Store the blob data
-	extRollup.BlobData = blobs
-
-	// Sign the rollup
-	if err := s.signRollup(extRollup); err != nil {
-		return nil, fmt.Errorf("failed to sign created rollup: %w", err)
+	// Calculate blob hash
+	blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute blob hash: %w", err)
 	}
+
+	// Store blob data and required fields
+	extRollup.BlobData = blobs
+	extRollup.Header.BlobHash = blobHash
+	extRollup.Header.MessageRoot = gethcommon.Hash{} // TODO: Implement message root
+	extRollup.Header.BlockNumber = currentL1Head.Number.Uint64()
+	extRollup.Header.CompressionL1Head = currentL1Head.Hash()
+
+	// Create composite hash matching the contract expectation
+	compositeHash := gethcrypto.Keccak256Hash(
+		blobHash.Bytes(),
+		extRollup.Header.MessageRoot.Bytes(),
+		currentL1Head.Hash().Bytes(),
+		big.NewInt(int64(currentL1Head.Number.Uint64())).Bytes(),
+		big.NewInt(int64(extRollup.Header.LastBatchSeqNo)).Bytes(),
+	)
+
+	// Sign the composite hash
+	signature, err := s.enclaveKeyService.Sign(compositeHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign rollup: %w", err)
+	}
+	extRollup.Header.Signature = signature
 
 	return extRollup, nil
 }

@@ -162,5 +162,9 @@ func ComputeBlobHash(blob *kzg4844.Blob) (gethcommon.Hash, error) {
 		return gethcommon.Hash{}, err
 	}
 
-	return KZGToVersionedHash(commitment), nil
+	// Create versioned hash matching EIP-4844 specification
+	var hash gethcommon.Hash
+	hash[0] = 0x01 // Version byte
+	copy(hash[1:], commitment[:])
+	return hash, nil
 }
