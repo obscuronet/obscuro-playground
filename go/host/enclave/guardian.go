@@ -440,8 +440,8 @@ func (g *Guardian) catchupWithL1() error {
 func (g *Guardian) catchupWithL2() error {
 	// while we are behind the L2 head and still running:
 	for g.running.Load() && g.state.GetStatus() == L2Catchup {
-		if g.hostData.IsSequencer {
-			return errors.New("l2 catchup is not supported for sequencer")
+		if g.hostData.IsSequencer && g.isActiveSequencer {
+			return errors.New("l2 catchup is not supported for active sequencer")
 		}
 		// request the next batch by sequence number (based on what the enclave has been fed so far)
 		prevHead := g.state.GetEnclaveL2Head()

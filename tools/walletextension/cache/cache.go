@@ -86,3 +86,27 @@ func WithCache[R any](cache Cache, cfg *Cfg, cacheKey []byte, onCacheMiss func()
 
 	return result, err
 }
+
+type noOpCache struct{}
+
+func NewNoOpCache() Cache {
+	return &noOpCache{}
+}
+
+func (c *noOpCache) EvictShortLiving() {}
+
+func (c *noOpCache) DisableShortLiving() {}
+
+func (c *noOpCache) IsEvicted(key []byte, originalTTL time.Duration) bool {
+	return false
+}
+
+func (c *noOpCache) Set(key []byte, value any, ttl time.Duration) bool {
+	return false
+}
+
+func (c *noOpCache) Get(key []byte) (value any, ok bool) {
+	return nil, false
+}
+
+func (c *noOpCache) Remove(key []byte) {}

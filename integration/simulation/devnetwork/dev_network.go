@@ -157,7 +157,7 @@ func (s *InMemDevNetwork) Start() {
 	s.startNodes()
 
 	// sleep to allow the nodes to start
-	time.Sleep(15 * time.Second)
+	time.Sleep(30 * time.Second) // it takes a while for the secret exchanges etc. to sort themselves out
 
 	seqClient, err := obsclient.Dial(s.SequencerRPCAddress())
 	if err != nil {

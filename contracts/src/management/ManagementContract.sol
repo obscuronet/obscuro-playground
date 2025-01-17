@@ -60,6 +60,8 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
 
     bytes32 public lastBatchHash;
 
+    uint256 private challengePeriod;
+
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         lastBatchSeqNo = 0;
@@ -118,7 +120,7 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
         require(block.number < (blockNum + 255), "Block binding too old");
         require(block.number != blockNum, "Cannot bind to the block that is being currently mined");
 
-        bytes32 knownBlockHash = blockhash(blockNum); 
+        bytes32 knownBlockHash = blockhash(blockNum);
         require(knownBlockHash != 0x0, "Unknown block hash");
         require(knownBlockHash == providedBlockHash, "Block binding mismatch");
         require(rollups.toUniqueForkID[rollupNumber] == forkID, "Invalid forkID");
@@ -131,14 +133,15 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
         bytes32 bundleHash = bytes32(0);
 
         for(uint256 i = 0; i < crossChainHashes.length; i++) {
-            merkleMessageBus.addStateRoot(bytes32(crossChainHashes[i]), block.timestamp); //todo: change the activation time.
+            merkleMessageBus.addStateRoot(
+                bytes32(crossChainHashes[i]), block.timestamp + challengePeriod
+            );
             bundleHash = keccak256(abi.encode(bundleHash, bytes32(crossChainHashes[i])));
         }
 
         isBundleSaved[bundleHash] = true;
     }
 
-// TODO: ensure challenge period is added on top of block timestamp.
     function pushCrossChainMessages(Structs.HeaderCrossChainData calldata crossChainData) internal {
         uint256 messagesLength = crossChainData.messages.length;
         for (uint256 i = 0; i < messagesLength; ++i) {
@@ -262,5 +265,15 @@ contract ManagementContract is Initializable, OwnableUpgradeable {
 
     function GetImportantContractKeys() public view returns(string[] memory) {
         return importantContractKeys;
+    }
+
+    // Return the challenge period delay for message bus root
+    function GetChallengePeriod() public view returns (uint256) {
+        return challengePeriod;
+    }
+
+    // Sets the challenge period for message bus root (owner only)
+    function SetChallengePeriod(uint256 _delay) public onlyOwner {
+        challengePeriod = _delay;
     }
 }

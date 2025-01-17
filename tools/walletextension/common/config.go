@@ -30,4 +30,5 @@ type Config struct {
 	EnableTLS                    bool
 	TLSDomain                    string
 	EncryptingCertificateEnabled bool
+	DisableCaching               bool
 }

@@ -467,6 +467,11 @@ func (e *enclaveAdminService) streamEventsForNewHeadBatch(ctx context.Context, b
 
 func (e *enclaveAdminService) ingestL1Block(ctx context.Context, processed *common.ProcessedL1Data) (*components.BlockIngestionType, error) {
 	e.logger.Info("Start ingesting block", log.BlockHashKey, processed.BlockHeader.Hash())
+	rollups, err := e.rollupConsumer.GetRollupsFromL1Data(processed)
+	if err != nil {
+		// early return before storing block if multiple rollups are found in the block
+		return nil, err
+	}
 	ingestion, err := e.l1BlockProcessor.Process(ctx, processed)
 	if err != nil {
 		// only warn for unexpected errors
@@ -478,7 +483,7 @@ func (e *enclaveAdminService) ingestL1Block(ctx context.Context, processed *comm
 		return nil, err
 	}
 
-	err = e.rollupConsumer.ProcessBlobsInBlock(ctx, processed)
+	err = e.rollupConsumer.ProcessRollups(ctx, rollups)
 	if err != nil && !errors.Is(err, components.ErrDuplicateRollup) {
 		e.logger.Error("Encountered error while processing l1 block rollups", log.ErrKey, err)
 		// Unsure what to do here; block has been stored

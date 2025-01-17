@@ -429,6 +429,40 @@ jobs:
              grant-sequencers.out
            retention-days: 7
 
+  set-challenge-period:
+    needs:
+      - build
+      - check-obscuro-is-healthy
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.testnet_type }}
+    steps:
+      -  uses: actions/checkout@v4
+
+      -  name: 'Set challenge period on management contract'
+         id: setChallengePeriod
+         shell: bash
+         run: |
+           go run ./testnet/launcher/l1challengeperiod/cmd \
+           -l1_http_url=${{ secrets.L1_HTTP_URL }} \
+           -private_key=${{ secrets.ACCOUNT_PK_WORKER }} \
+           -management_contract_addr=${{ needs.build.outputs.MGMT_CONTRACT_ADDR }} \
+           -docker_image=${{ vars.L2_HARDHATDEPLOYER_DOCKER_BUILD_TAG }} \
+           -l1_challenge_period=${{ vars.L1_CHALLENGE_PERIOD }} \
+           echo "Setting challenge period to ${{ vars.L1_CHALLENGE_PERIOD }}"
+
+      -  name: 'Save challenge period container logs'
+         run: |
+           docker logs `docker ps -aqf "name=set-challenge-period"` > set-challenge-period.out 2>&1
+
+      -  name: 'Upload challenge period container logs'
+         uses: actions/upload-artifact@v4
+         with:
+           name: set-challenge-period
+           path: |
+             set-challenge-period.out
+           retention-days: 7
+
   deploy-l2-contracts:
     needs:
       - build

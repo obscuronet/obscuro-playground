@@ -61,10 +61,18 @@ type NewHeadNotifier interface {
 const rpcResponseCacheSize = 1_000_000
 
 func NewServices(hostAddrHTTP string, hostAddrWS string, storage storage.UserStorage, stopControl *stopcontrol.StopControl, version string, logger gethlog.Logger, metricsTracker metrics.Metrics, config *common.Config) *Services {
-	newGatewayCache, err := cache.NewCache(rpcResponseCacheSize, logger)
-	if err != nil {
-		logger.Error(fmt.Errorf("could not create cache. Cause: %w", err).Error())
-		panic(err)
+	var newGatewayCache cache.Cache
+	var err error
+
+	if !config.DisableCaching {
+		newGatewayCache, err = cache.NewCache(rpcResponseCacheSize, logger)
+		if err != nil {
+			logger.Error(fmt.Errorf("could not create cache. Cause: %w", err).Error())
+			panic(err)
+		}
+	} else {
+		// Create a no-op cache implementation when caching is disabled
+		newGatewayCache = cache.NewNoOpCache()
 	}
 
 	rateLimiter := ratelimiter.NewRateLimiter(config.RateLimitUserComputeTime, config.RateLimitWindow, uint32(config.RateLimitMaxConcurrentRequests), logger)

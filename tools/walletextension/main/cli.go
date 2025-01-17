@@ -92,6 +92,10 @@ const (
 	encryptingCertificateEnabledFlagName    = "encryptingCertificateEnabled"
 	encryptingCertificateEnabledFlagDefault = false
 	encryptingCertificateEnabledFlagUsage   = "Flag to enable encrypting certificate functionality. Default: false"
+
+	disableCachingFlagName    = "disableCaching"
+	disableCachingFlagDefault = false
+	disableCachingFlagUsage   = "Flag to disable response caching in the gateway. Default: false"
 )
 
 func parseCLIArgs() wecommon.Config {
@@ -116,6 +120,7 @@ func parseCLIArgs() wecommon.Config {
 	enableTLSFlag := flag.Bool(enableTLSFlagName, enableTLSFlagDefault, enableTLSFlagUsage)
 	tlsDomainFlag := flag.String(tlsDomainFlagName, tlsDomainFlagDefault, tlsDomainFlagUsage)
 	encryptingCertificateEnabled := flag.Bool(encryptingCertificateEnabledFlagName, encryptingCertificateEnabledFlagDefault, encryptingCertificateEnabledFlagUsage)
+	disableCaching := flag.Bool(disableCachingFlagName, disableCachingFlagDefault, disableCachingFlagUsage)
 	flag.Parse()
 
 	return wecommon.Config{
@@ -139,5 +144,6 @@ func parseCLIArgs() wecommon.Config {
 		EnableTLS:                      *enableTLSFlag,
 		TLSDomain:                      *tlsDomainFlag,
 		EncryptingCertificateEnabled:   *encryptingCertificateEnabled,
+		DisableCaching:                 *disableCaching,
 	}
 }

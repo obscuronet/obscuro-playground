@@ -75,7 +75,6 @@ func UnauthenticatedTenRPCCall[R any](ctx context.Context, w *services.Services,
 			return resp, err
 		})
 	})
-
 	if err != nil {
 		audit(w, "RPC call failed. method=%s args=%v error=%+v time=%d", method, args, err, time.Since(requestStartTime).Milliseconds())
 		return nil, err
