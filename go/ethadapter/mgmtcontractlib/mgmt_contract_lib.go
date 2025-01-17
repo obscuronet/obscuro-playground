@@ -116,15 +116,33 @@ func (c *contractLibImpl) DecodeTx(tx *types.Transaction) common.L1TenTransactio
 
 // CreateBlobRollup creates a BlobTx, encoding the rollup data into blobs.
 func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, error) {
+	// First decode the rollup
 	decodedRollup, err := common.DecodeRollup(t.Rollup)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to decode rollup: %w", err)
 	}
 
+	// Create the blobs from the encoded rollup data
+	blobs, err := ethadapter.EncodeBlobs(t.Rollup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
+	}
+
+	// Calculate blob hash from first blob
+	blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute blob hash: %w", err)
+	}
+
+	// Use RollupHeader fields directly
 	metaRollup := ManagementContract.StructsMetaRollup{
-		Hash:               decodedRollup.Hash(),
+		Hash:               decodedRollup.Header.PayloadHash,
 		Signature:          decodedRollup.Header.Signature,
 		LastSequenceNumber: big.NewInt(int64(decodedRollup.Header.LastBatchSeqNo)),
+		BlockHash:          decodedRollup.Header.CompressionL1Head, // Using CompressionL1Head as BlockHash
+		MessageRoot:        common.Hash{},                          // Zero for now as specified
+		BlockNumber:        big.NewInt(int64(decodedRollup.Header.BlockNumber)),
+		BlobHash:           blobHash,
 	}
 
 	data, err := c.contractABI.Pack(
@@ -132,12 +150,7 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 		metaRollup,
 	)
 	if err != nil {
-		panic(err)
-	}
-
-	blobs, err := ethadapter.EncodeBlobs(t.Rollup)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
+		return nil, err
 	}
 
 	var blobHashes []gethcommon.Hash

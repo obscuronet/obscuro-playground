@@ -154,3 +154,13 @@ func ReconstructRollup(blobs []*kzg4844.Blob) (*common.ExtRollup, error) {
 
 	return &rollup, nil
 }
+
+// ComputeBlobHash computes the versioned hash of a blob that matches the blobhash opcode
+func ComputeBlobHash(blob *kzg4844.Blob) (gethcommon.Hash, error) {
+	commitment, err := kzg4844.BlobToCommitment(blob)
+	if err != nil {
+		return gethcommon.Hash{}, err
+	}
+
+	return KZGToVersionedHash(commitment), nil
+}
