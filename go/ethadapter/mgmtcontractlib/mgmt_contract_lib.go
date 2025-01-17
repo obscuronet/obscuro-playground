@@ -116,33 +116,20 @@ func (c *contractLibImpl) DecodeTx(tx *types.Transaction) common.L1TenTransactio
 
 // CreateBlobRollup creates a BlobTx, encoding the rollup data into blobs.
 func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, error) {
-	// First decode the rollup
 	decodedRollup, err := common.DecodeRollup(t.Rollup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode rollup: %w", err)
 	}
 
-	// Create the blobs from the encoded rollup data
-	blobs, err := ethadapter.EncodeBlobs(t.Rollup)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
-	}
-
-	// Calculate blob hash from first blob
-	blobHash, err := ethadapter.ComputeBlobHash(blobs[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to compute blob hash: %w", err)
-	}
-
-	// Use RollupHeader fields directly
+	// Use the pre-computed values from the enclave
 	metaRollup := ManagementContract.StructsMetaRollup{
 		Hash:               decodedRollup.Header.PayloadHash,
 		Signature:          decodedRollup.Header.Signature,
 		LastSequenceNumber: big.NewInt(int64(decodedRollup.Header.LastBatchSeqNo)),
-		BlockHash:          decodedRollup.Header.CompressionL1Head, // Using CompressionL1Head as BlockHash
-		MessageRoot:        gethcommon.Hash{},                      // Zero for now as specified
+		BlockHash:          decodedRollup.Header.CompressionL1Head,
+		MessageRoot:        decodedRollup.Header.MessageRoot,
 		BlockNumber:        big.NewInt(int64(decodedRollup.Header.BlockNumber)),
-		BlobHash:           blobHash,
+		BlobHash:           decodedRollup.Header.BlobHash,
 	}
 
 	data, err := c.contractABI.Pack(
@@ -153,10 +140,11 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 		return nil, err
 	}
 
-	var blobHashes []gethcommon.Hash
 	var sidecar *types.BlobTxSidecar
+	var blobHashes []gethcommon.Hash
 
-	if sidecar, blobHashes, err = ethadapter.MakeSidecar(blobs); err != nil {
+	// Use the pre-created blobs from the enclave
+	if sidecar, blobHashes, err = ethadapter.MakeSidecar(decodedRollup.BlobData); err != nil {
 		return nil, fmt.Errorf("failed to make sidecar: %w", err)
 	}
 
