@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ten-protocol/go-ten/contracts/generated/ManagementContract"
 	"github.com/ten-protocol/go-ten/go/common"
 	"github.com/ten-protocol/go-ten/go/common/log"
@@ -121,6 +122,29 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 		return nil, fmt.Errorf("failed to decode rollup: %w", err)
 	}
 
+	// Create the blobs here when needed for L1 tx
+	rollupData, err := common.EncodeRollup(decodedRollup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode rollup: %w", err)
+	}
+
+	blobs, err := ethadapter.EncodeBlobs(rollupData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode rollup to blobs: %w", err)
+	}
+
+	// Verify the blob hash matches what was signed
+	commitment, err := kzg4844.BlobToCommitment(blobs[0])
+	if err != nil {
+		return nil, fmt.Errorf("cannot compute KZG commitment: %w", err)
+	}
+	computedBlobHash := ethadapter.KZGToVersionedHash(commitment)
+
+	// Verify hash matches what was signed
+	if computedBlobHash != decodedRollup.Header.BlobHash {
+		return nil, fmt.Errorf("computed blob hash doesn't match signed hash")
+	}
+
 	// Use the pre-computed values from the enclave
 	metaRollup := ManagementContract.StructsMetaRollup{
 		Hash:               decodedRollup.Header.PayloadHash,
@@ -144,7 +168,7 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 	var blobHashes []gethcommon.Hash
 
 	// Use the pre-created blobs from the enclave
-	if sidecar, blobHashes, err = ethadapter.MakeSidecar(decodedRollup.BlobData); err != nil {
+	if sidecar, blobHashes, err = ethadapter.MakeSidecar(blobs); err != nil {
 		return nil, fmt.Errorf("failed to make sidecar: %w", err)
 	}
 

@@ -342,7 +342,6 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 		"upToL1Height", upToL1Height)
 
 	// Store blob data and required fields
-	extRollup.BlobData = blobs
 	extRollup.Header.BlobHash = blobHash
 	extRollup.Header.MessageRoot = gethcommon.Hash{} // Zero for now, will be implemented later
 	extRollup.Header.BlockNumber = currentL1Head.Number.Uint64()
