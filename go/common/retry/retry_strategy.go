@@ -131,3 +131,42 @@ func (irs *infiniteRetryStrategy) Reset() {
 	irs.attempts = 0
 	irs.startTime = time.Now()
 }
+
+// NewExponentialBackoffInfiniteStrategy keeps retrying until successful with exponential backoff capped at maxDelay
+func NewExponentialBackoffInfiniteStrategy(initialInterval time.Duration, maxDelay time.Duration) Strategy {
+	return &exponentialBackoffInfiniteStrategy{
+		initialInterval: initialInterval,
+		maxDelay:        maxDelay,
+	}
+}
+
+type exponentialBackoffInfiniteStrategy struct {
+	initialInterval time.Duration
+	maxDelay        time.Duration
+
+	startTime time.Time
+	attempts  uint64
+}
+
+func (b *exponentialBackoffInfiniteStrategy) NextRetryInterval() time.Duration {
+	b.attempts++
+	// Calculate delay: initial * 2^(attempt-1), but capped at maxDelay
+	delay := b.initialInterval * time.Duration(math.Pow(2, float64(b.attempts-1)))
+	if delay > b.maxDelay {
+		delay = b.maxDelay
+	}
+	return delay
+}
+
+func (b *exponentialBackoffInfiniteStrategy) Done() bool {
+	return false // Never stop retrying
+}
+
+func (b *exponentialBackoffInfiniteStrategy) Summary() string {
+	return fmt.Sprintf("retrying after %d attempts over %s", b.attempts, time.Since(b.startTime))
+}
+
+func (b *exponentialBackoffInfiniteStrategy) Reset() {
+	b.attempts = 0
+	b.startTime = time.Now()
+}
