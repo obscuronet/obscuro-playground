@@ -53,9 +53,9 @@ func (rc *rollupConsumerImpl) ProcessRollups(ctx context.Context, rollups []*com
 	defer core.LogMethodDuration(rc.logger, measure.NewStopwatch(), "Rollup consumer processed blobs")
 
 	for _, rollup := range rollups {
-		l1CompressionBlock, err := rc.storage.FetchBlock(ctx, rollup.Header.CompressionL1Head)
+		l1CompressionBlock, err := rc.storage.FetchBlock(ctx, rollup.Header.BlockHash)
 		if err != nil {
-			rc.logger.Warn("Can't process rollup because the l1 block used for compression is not available", "block_hash", rollup.Header.CompressionL1Head, log.RollupHashKey, rollup.Hash(), log.ErrKey, err)
+			rc.logger.Warn("Can't process rollup because the l1 block used for compression is not available", "block_hash", rollup.Header.BlockHash, log.RollupHashKey, rollup.Hash(), log.ErrKey, err)
 			continue
 		}
 		canonicalBlockByHeight, err := rc.storage.FetchCanonicaBlockByHeight(ctx, l1CompressionBlock.Number)
@@ -63,7 +63,7 @@ func (rc *rollupConsumerImpl) ProcessRollups(ctx context.Context, rollups []*com
 			return err
 		}
 		if canonicalBlockByHeight.Hash() != l1CompressionBlock.Hash() {
-			rc.logger.Warn("Skipping rollup because it was compressed on top of a non-canonical rollup", "block_hash", rollup.Header.CompressionL1Head, log.RollupHashKey, rollup.Hash(), log.ErrKey, err)
+			rc.logger.Warn("Skipping rollup because it was compressed on top of a non-canonical rollup", "block_hash", rollup.Header.BlockHash, log.RollupHashKey, rollup.Hash(), log.ErrKey, err)
 			continue
 		}
 		// read batch data from rollup, verify and store it
