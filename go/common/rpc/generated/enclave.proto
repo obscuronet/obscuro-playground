@@ -301,7 +301,7 @@ message ExtRollupMsg {
 
 message RollupHeaderMsg {
   bytes ParentHash = 1;
-  bytes CompressionL1Head = 2;
+  bytes BlockHash = 2;
   uint64 ProofNumber = 3;
   uint64 Number = 4;
   uint64 Time = 5;
