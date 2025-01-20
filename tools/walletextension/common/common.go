@@ -2,6 +2,8 @@ package common
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -80,4 +82,13 @@ func GenerateRandomKey() ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+// HashForLogging creates a double-hashed hex string of the input bytes for secure logging
+func HashForLogging(input []byte) string {
+	// First hash
+	firstHash := sha256.Sum256(input)
+	// Second hash
+	secondHash := sha256.Sum256(firstHash[:])
+	return hex.EncodeToString(secondHash[:])
 }

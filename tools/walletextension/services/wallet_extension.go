@@ -200,14 +200,14 @@ func (w *Services) GenerateAndStoreNewUser() ([]byte, error) {
 
 	requestEndTime := time.Now()
 	duration := requestEndTime.Sub(requestStartTime)
-	audit(w, "Storing new userID: %s, duration: %d ", hexutils.BytesToHex(userID), duration.Milliseconds())
+	audit(w, "Storing new userID: %s, duration: %d ", common.HashForLogging(userID), duration.Milliseconds())
 	return userID, nil
 }
 
 // AddAddressToUser checks if a message is in correct format and if signature is valid. If all checks pass we save address and signature against userID
 func (w *Services) AddAddressToUser(userID []byte, address string, signature []byte, signatureType viewingkey.SignatureType) error {
 	w.MetricsTracker.RecordUserActivity(hexutils.BytesToHex(userID))
-	audit(w, "Adding address to user: %s, address: %s", hexutils.BytesToHex(userID), address)
+	audit(w, "Adding address to user: %s, address: %s", common.HashForLogging(userID), address)
 	requestStartTime := time.Now()
 	addressFromMessage := gethcommon.HexToAddress(address)
 	// check if a message was signed by the correct address and if the signature is valid
@@ -235,7 +235,7 @@ func (w *Services) AddAddressToUser(userID []byte, address string, signature []b
 // UserHasAccount checks if provided account exist in the database for given userID
 func (w *Services) UserHasAccount(userID []byte, address string) (bool, error) {
 	w.MetricsTracker.RecordUserActivity(hexutils.BytesToHex(userID))
-	audit(w, "Checking if user has account: %s, address: %s", hexutils.BytesToHex(userID), address)
+	audit(w, "Checking if user has account: %s, address: %s", common.HashForLogging(userID), address)
 	addressBytes, err := hex.DecodeString(address[2:]) // remove 0x prefix from address
 	if err != nil {
 		w.Logger().Error(fmt.Errorf("error decoding string (%s), %w", address[2:], err).Error())
