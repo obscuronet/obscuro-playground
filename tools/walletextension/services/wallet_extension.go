@@ -157,7 +157,7 @@ func subscribeToNewHeadsWithRetry(ch chan *tencommon.BatchHeader, services *Serv
 			}
 			return err
 		},
-		retry.NewTimeoutStrategy(20*time.Minute, 1*time.Second),
+		retry.NewExponentialBackoffInfiniteStrategy(1*time.Second, 1*time.Minute),
 	)
 	if err != nil {
 		logger.Error("could not subscribe for new head blocks.", log.ErrKey, err)
