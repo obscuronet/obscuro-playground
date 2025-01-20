@@ -336,12 +336,17 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 	}
 	blobHash := ethadapter.KZGToVersionedHash(commitment)
 
+	s.logger.Info("Block binding info",
+		"currentL1Head.Number", currentL1Head.Number,
+		"currentL1Head.Hash", currentL1Head.Hash(),
+		"upToL1Height", upToL1Height)
+
 	// Store blob data and required fields
 	extRollup.BlobData = blobs
 	extRollup.Header.BlobHash = blobHash
 	extRollup.Header.MessageRoot = gethcommon.Hash{} // Zero for now, will be implemented later
 	extRollup.Header.BlockNumber = currentL1Head.Number.Uint64()
-	extRollup.Header.CompressionL1Head = currentL1Head.Hash()
+	extRollup.Header.BlockHash = currentL1Head.Hash()
 
 	// Create composite hash matching the contract's expectations
 	compositeHash := gethcrypto.Keccak256Hash(
@@ -358,6 +363,10 @@ func (s *sequencer) CreateRollup(ctx context.Context, lastBatchNo uint64) (*comm
 		return nil, fmt.Errorf("failed to sign rollup: %w", err)
 	}
 	extRollup.Header.Signature = signature
+
+	s.logger.Info("Rollup block binding",
+		"BlockNumber", extRollup.Header.BlockNumber,
+		"BlockHash", extRollup.Header.BlockHash)
 
 	return extRollup, nil
 }

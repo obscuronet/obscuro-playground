@@ -144,7 +144,7 @@ func (rc *RollupCompression) ProcessExtRollup(ctx context.Context, rollup *commo
 	// The recreation of batches is a 2-step process:
 
 	// 1. calculate fields like: sequence, height, time, l1Proof, from the implicit and explicit information from the metadata
-	incompleteBatches, err := rc.createIncompleteBatches(ctx, calldataRollupHeader, transactionsPerBatch, rollup.Header.CompressionL1Head)
+	incompleteBatches, err := rc.createIncompleteBatches(ctx, calldataRollupHeader, transactionsPerBatch, rollup.Header.BlockHash)
 	if err != nil {
 		return nil, err
 	}

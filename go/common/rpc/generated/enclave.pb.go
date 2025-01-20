@@ -3075,7 +3075,7 @@ func (x *ExtRollupMsg) GetCalldataRollupHeader() []byte {
 type RollupHeaderMsg struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ParentHash         []byte                 `protobuf:"bytes,1,opt,name=ParentHash,proto3" json:"ParentHash,omitempty"`
-	CompressionL1Head  []byte                 `protobuf:"bytes,2,opt,name=CompressionL1Head,proto3" json:"CompressionL1Head,omitempty"`
+	CompressionL1Head  []byte                 `protobuf:"bytes,2,opt,name=BlockHash,proto3" json:"BlockHash,omitempty"`
 	ProofNumber        uint64                 `protobuf:"varint,3,opt,name=ProofNumber,proto3" json:"ProofNumber,omitempty"`
 	Number             uint64                 `protobuf:"varint,4,opt,name=Number,proto3" json:"Number,omitempty"`
 	Time               uint64                 `protobuf:"varint,5,opt,name=Time,proto3" json:"Time,omitempty"`
