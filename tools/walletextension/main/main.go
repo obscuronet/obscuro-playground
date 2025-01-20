@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	tcp = "tcp"
 	// @fixme -
 	// this is a temporary fix as out forked version of log.go does not map with gethlog.Level<Level>
 	// and should be fixed as part of logging refactoring in the future
