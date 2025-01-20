@@ -144,20 +144,27 @@ func _startCacheEviction(services *Services, logger gethlog.Logger) {
 
 func subscribeToNewHeadsWithRetry(ch chan *tencommon.BatchHeader, services *Services, logger gethlog.Logger) (<-chan error, error) {
 	var sub *gethrpc.ClientSubscription
+	attempt := 1
+
 	err := retry.Do(
 		func() error {
 			connectionObj, err := services.BackendRPC.PlainConnectWs(context.Background())
 			if err != nil {
+				logger.Info("connection failed - retrying", "attempt", attempt)
+				attempt++
 				return fmt.Errorf("cannot fetch rpc connection to backend node %w", err)
 			}
 			sub, err = connectionObj.Subscribe(context.Background(), rpc.SubscribeNamespace, ch, rpc.SubscriptionTypeNewHeads)
 			if err != nil {
 				logger.Info("could not subscribe for new head blocks", log.ErrKey, err)
 				_ = services.BackendRPC.ReturnConnWS(connectionObj)
+				attempt++
+				return err
 			}
-			return err
+			logger.Info("successfully connected to node")
+			return nil
 		},
-		retry.NewExponentialBackoffInfiniteStrategy(1*time.Second, 1*time.Minute),
+		retry.NewExponentialBackoffInfiniteStrategy(1*time.Second, 30*time.Second),
 	)
 	if err != nil {
 		logger.Error("could not subscribe for new head blocks.", log.ErrKey, err)
