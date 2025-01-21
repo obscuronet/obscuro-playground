@@ -167,7 +167,7 @@ func (c *contractLibImpl) CreateBlobRollup(t *common.L1RollupTx) (types.TxData, 
 	var sidecar *types.BlobTxSidecar
 	var blobHashes []gethcommon.Hash
 
-	// Use the pre-created blobs from the enclave
+	// Use se blobs created here (they are verified that the hash matches with the blobs from the enclave)
 	if sidecar, blobHashes, err = ethadapter.MakeSidecar(blobs); err != nil {
 		return nil, fmt.Errorf("failed to make sidecar: %w", err)
 	}
