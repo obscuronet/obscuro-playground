@@ -17,6 +17,6 @@ func NewIdentity(cfg *hostconfig.HostConfig) Identity {
 		ID:               cfg.ID,
 		P2PPublicAddress: cfg.P2PPublicAddress,
 		IsGenesis:        cfg.IsGenesis,
-		IsSequencer:      cfg.NodeType == common.ActiveSequencer,
+		IsSequencer:      cfg.NodeType == common.Sequencer,
 	}
 }

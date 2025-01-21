@@ -186,7 +186,7 @@ func (s *InMemDevNetwork) GetGatewayClient() (ethadapter.EthClient, error) {
 func (s *InMemDevNetwork) startNodes() {
 	if s.tenSequencer == nil {
 		// initialise node operators (sequencer is node 0, validators are 1..N)
-		s.tenSequencer = NewInMemNodeOperator(0, s.tenConfig, common.ActiveSequencer, s.l1SetupData, s.l1Network.GetClient(0), s.networkWallets.NodeWallets[0], s.logger)
+		s.tenSequencer = NewInMemNodeOperator(0, s.tenConfig, common.Sequencer, s.l1SetupData, s.l1Network.GetClient(0), s.networkWallets.NodeWallets[0], s.logger)
 		for i := 1; i <= s.tenConfig.InitNumValidators; i++ {
 			l1Client := s.l1Network.GetClient(i % s.l1Network.NumNodes())
 			s.tenValidators = append(s.tenValidators, NewInMemNodeOperator(i, s.tenConfig, common.Validator, s.l1SetupData, l1Client, s.networkWallets.NodeWallets[i], s.logger))

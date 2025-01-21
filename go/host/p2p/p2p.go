@@ -68,7 +68,7 @@ func NewSocketP2PLayer(config *hostconfig.HostConfig, serviceLocator p2pServiceL
 		stopControl: stopcontrol.New(),
 		sl:          serviceLocator,
 
-		isSequencer:      config.NodeType == common.ActiveSequencer,
+		isSequencer:      config.NodeType == common.Sequencer,
 		ourBindAddress:   config.P2PBindAddress,
 		ourPublicAddress: config.P2PPublicAddress,
 		sequencerAddress: config.SequencerP2PAddress,

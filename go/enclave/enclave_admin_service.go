@@ -57,6 +57,7 @@ type enclaveAdminService struct {
 	enclaveKeyService      *crypto.EnclaveAttestedKeyService
 	mempool                *components.TxPool
 	sharedSecretService    *crypto.SharedSecretService
+	activeSequencer        bool
 }
 
 func NewEnclaveAdminAPI(config *enclaveconfig.EnclaveConfig, storage storage.Storage, logger gethlog.Logger, blockProcessor components.L1BlockProcessor, registry components.BatchRegistry, batchExecutor components.BatchExecutor, gethEncodingService gethencoding.EncodingService, stopControl *stopcontrol.StopControl, subscriptionManager *events.SubscriptionManager, enclaveKeyService *crypto.EnclaveAttestedKeyService, mempool *components.TxPool, chainConfig *params.ChainConfig, mgmtContractLib mgmtcontractlib.MgmtContractLib, attestationProvider components.AttestationProvider, sharedSecretService *crypto.SharedSecretService, daEncryptionService *crypto.DAEncryptionService) common.EnclaveAdmin {
@@ -119,9 +120,6 @@ func NewEnclaveAdminAPI(config *enclaveconfig.EnclaveConfig, storage storage.Sto
 	if eas.isBackupSequencer(context.Background()) || eas.isActiveSequencer(context.Background()) {
 		mempool.SetValidateMode(false)
 	}
-	if eas.isActiveSequencer(context.Background()) {
-		eas.service = sequencerService
-	}
 
 	return eas
 }
@@ -129,7 +127,7 @@ func NewEnclaveAdminAPI(config *enclaveconfig.EnclaveConfig, storage storage.Sto
 // addSequencer is used internally to add a sequencer enclaveID to the pool of attested enclaves.
 // If it is the current enclave it will change the behaviour of this enclave to be a backup sequencer (ready to become active).
 func (e *enclaveAdminService) addSequencer(id common.EnclaveID, _ types.Receipt) common.SystemError {
-	err := e.storage.StoreNodeType(context.Background(), id, common.BackupSequencer)
+	err := e.storage.StoreNodeType(context.Background(), id, common.Sequencer)
 	if err != nil {
 		return responses.ToInternalError(err)
 	}
@@ -150,12 +148,10 @@ func (e *enclaveAdminService) MakeActive() common.SystemError {
 		return fmt.Errorf("only backup sequencer can become active")
 	}
 
-	err := e.storage.StoreNodeType(context.Background(), e.enclaveKeyService.EnclaveID(), common.ActiveSequencer)
-	if err != nil {
-		return err
-	}
-
+	e.activeSequencer = true
 	e.service = e.sequencerService
+	e.logger.Info("Enclave is now active sequencer.")
+
 	return nil
 }
 
@@ -544,11 +540,11 @@ func (e *enclaveAdminService) sequencer() nodetype.ActiveSequencer {
 }
 
 func (e *enclaveAdminService) isActiveSequencer(ctx context.Context) bool {
-	return e.getNodeType(ctx) == common.ActiveSequencer
+	return e.activeSequencer && e.getNodeType(ctx) == common.Sequencer
 }
 
 func (e *enclaveAdminService) isBackupSequencer(ctx context.Context) bool {
-	return e.getNodeType(ctx) == common.BackupSequencer
+	return e.getNodeType(ctx) == common.Sequencer && !e.activeSequencer
 }
 
 func (e *enclaveAdminService) isValidator(ctx context.Context) bool { //nolint:unused

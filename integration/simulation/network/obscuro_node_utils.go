@@ -194,7 +194,7 @@ func isAddressAvailable(address string) bool {
 func GetNodeType(i int) common.NodeType {
 	// Only the genesis node is assigned the role of sequencer.
 	if i == 0 {
-		return common.ActiveSequencer
+		return common.Sequencer
 	}
 	return common.Validator
 }

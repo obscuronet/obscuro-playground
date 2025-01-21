@@ -72,7 +72,7 @@ func (n *InMemNodeOperator) StopHost() error {
 func (n *InMemNodeOperator) Start() error {
 	var err error
 	numEnclaves := n.config.NumSeqEnclaves
-	if n.nodeType != common.ActiveSequencer {
+	if n.nodeType != common.Sequencer {
 		numEnclaves = 1
 	}
 	n.enclaves = make([]*enclavecontainer.EnclaveContainer, numEnclaves)
@@ -115,7 +115,7 @@ func (n *InMemNodeOperator) StartEnclave(idx int) error {
 func (n *InMemNodeOperator) createHostContainer() *hostcontainer.HostContainer {
 	enclavePort := n.config.PortStart + integration.DefaultEnclaveOffset + n.operatorIdx
 	var enclaveAddresses []string
-	if n.nodeType == common.ActiveSequencer {
+	if n.nodeType == common.Sequencer {
 		for i := 0; i < n.config.NumSeqEnclaves; i++ {
 			enclaveAddresses = append(enclaveAddresses, fmt.Sprintf("%s:%d", network.Localhost, enclavePort+(i*_multiEnclaveOffset)))
 		}
@@ -129,7 +129,7 @@ func (n *InMemNodeOperator) createHostContainer() *hostcontainer.HostContainer {
 
 	hostConfig := &hostconfig.HostConfig{
 		ID:                        fmt.Sprintf("%d", n.operatorIdx),
-		IsGenesis:                 n.nodeType == common.ActiveSequencer,
+		IsGenesis:                 n.nodeType == common.Sequencer,
 		NodeType:                  n.nodeType,
 		HasClientRPCHTTP:          true,
 		ClientRPCPortHTTP:         uint64(n.config.PortStart + integration.DefaultHostRPCHTTPOffset + n.operatorIdx),
@@ -272,7 +272,7 @@ func NewInMemNodeOperator(operatorIdx int, config *TenConfig, nodeType common.No
 ) *InMemNodeOperator {
 	// todo (@matt) - put sqlite and levelDB storage in the same temp dir
 	numEnclaves := config.NumSeqEnclaves
-	if nodeType != common.ActiveSequencer {
+	if nodeType != common.Sequencer {
 		numEnclaves = 1
 	}
 	sqliteDBPaths := make([]string, numEnclaves)

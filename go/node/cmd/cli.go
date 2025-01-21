@@ -226,7 +226,7 @@ func NodeCLIConfigToTenConfig(cliCfg *NodeConfigCLI) *config.TenConfig {
 
 	// the sequencer does not store the executed transactions
 	// todo - once we replace this launcher we'll configure this flag explicitly via an environment variable
-	if nodeType == common.ActiveSequencer {
+	if nodeType == common.Sequencer {
 		tenCfg.Enclave.StoreExecutedTransactions = false
 	}
 

@@ -282,10 +282,10 @@ func (h *host) NewHeadsChan() chan *common.BatchHeader {
 
 // Checks the host config is valid.
 func (h *host) validateConfig() {
-	if h.config.IsGenesis && h.config.NodeType != common.ActiveSequencer {
+	if h.config.IsGenesis && h.config.NodeType != common.Sequencer {
 		h.logger.Crit("genesis node must be the sequencer")
 	}
-	if !h.config.IsGenesis && h.config.NodeType == common.ActiveSequencer {
+	if !h.config.IsGenesis && h.config.NodeType == common.Sequencer {
 		h.logger.Crit("only the genesis node can be a sequencer")
 	}
 
