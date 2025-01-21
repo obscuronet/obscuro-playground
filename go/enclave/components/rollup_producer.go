@@ -3,7 +3,6 @@ package components
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/core/types"
 
@@ -47,7 +46,7 @@ func (re *rollupProducerImpl) CreateInternalRollup(ctx context.Context, fromBatc
 		return nil, fmt.Errorf("no batches for rollup")
 	}
 
-	block, err := re.storage.FetchCanonicaBlockByHeight(ctx, big.NewInt(int64(upToL1Height)))
+	block, err := re.storage.FetchHeadBlock(ctx)
 	if err != nil {
 		return nil, err
 	}
